@@ -132,3 +132,18 @@ FakesAssemblies/
 *.i*86
 *.x86_64
 *.hex
+
+# Roslyn cache directories
+*.ide/
+
+## TODO: If the tool you use requires repositories.config
+## uncomment the next line
+#!packages/repositories.config
+
+# Others
+sql/
+
+# LightSwitch generated files
+GeneratedArtifacts/
+_Pvt_Extensions/
+ModelManifest.xml

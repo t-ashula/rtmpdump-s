@@ -85,6 +85,18 @@ namespace librtmp
             return a1.av_len == a2.av_len
                    && a1.av_val.SequenceEqual(a2.av_val);
         }
+
+        /// <summary> #define AVC(str) {str,sizeof(str)-1} </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static AVal AVC(string str)
+        {
+            return new AVal
+            {
+                av_len = str.Length,
+                av_val = str.ToCharArray().Select(c => (byte)c).ToArray()
+            };
+        }
     }
 
     /// <summary> struct AMFObject </summary>

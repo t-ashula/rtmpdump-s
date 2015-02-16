@@ -55,125 +55,7 @@ namespace rtmpsuck
 
     public class App
     {
-        public RD_STATUS Run(string[] args)
-        {
-            var nStatus = RD_STATUS.RD_SUCCESS;
-            const string DEFAULT_RTMP_STREAMING_DEVICE = "0.0.0.0";
-            var rtmpStreamingDevice = DEFAULT_RTMP_STREAMING_DEVICE;
-            var nRtmpStreamingPort = 1935;
-
-            const string RTMPDUMP_VERSION = "v2.4"; // TODO:
-            Log.RTMP_LogPrintf("RTMP Proxy Server {0}\n", RTMPDUMP_VERSION);
-            Log.RTMP_LogPrintf("(c) 2010 Andrej Stepanchuk, Howard Chu; license: GPL\n\n");
-            Log.RTMP_LogSetLevel(Log.RTMP_LogLevel.RTMP_LOGINFO);
-
-            if (args.Length > 0 && args[0] == "-z")
-            {
-                Log.RTMP_LogSetLevel(Log.RTMP_LogLevel.RTMP_LOGALL);
-            }
-
-            Console.CancelKeyPress += sigIntHandler;
-            // TODO: signal(SIGPIPE, SIG_IGN);
-
-            open_dump_file();
-
-            // InitSocket();
-
-            ThreadCreate(controlServerThread);
-            rtmpServer = startStreaming(rtmpStreamingDevice, nRtmpStreamingPort);
-            if (rtmpServer == null)
-            {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Failed to start RTMP server, exiting!");
-                return RD_STATUS.RD_FAILED;
-            }
-
-            Log.RTMP_LogPrintf("Streaming on rtmp://{0}:{1}\n", rtmpStreamingDevice, nRtmpStreamingPort);
-            while (rtmpServer.state != STREAMING_STATUS.STREAMING_STOPPED)
-            {
-                Thread.Sleep(1000);
-            }
-
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Done, extiting...");
-
-            // CleanupSockets();
-
-            close_dump_file();
-
-            return nStatus;
-        }
-
-        private void ThreadCreate(Action func)
-        {
-            var start = new ThreadStart(func);
-            var th = new Thread(start);
-            th.Start();
-        }
-
-        private void ThreadCreate<T>(Action<T> func, T arg)
-        {
-            var start = new ThreadStart(() => func(arg));
-            var th = new Thread(start);
-            th.Start();
-        }
-
-        private void controlServerThread()
-        {
-            while (true)
-            {
-                var ich = Console.ReadKey();
-                switch (ich.KeyChar)
-                {
-                    case 'q':
-                        Log.RTMP_LogPrintf("Exiting\n");
-                        stopStreaming(rtmpServer);
-                        Environment.Exit(0); // FIXME: more portable.
-                        break;
-
-                    default:
-                        Log.RTMP_LogPrintf("Unknown command '{0}', ignoring\n", ich.KeyChar);
-                        break;
-                }
-            }
-        }
-
-        // TODO: C#-style resource handling
-
-        private BinaryWriter _netStackDump;
-
-        private BinaryWriter _netStackDumpRead;
-
-        [Conditional("DEBUG")]
-        private void open_dump_file()
-        {
-            _netStackDump = new BinaryWriter(new FileStream("netstackdump", FileMode.CreateNew, FileAccess.Write));
-            _netStackDumpRead = new BinaryWriter(new FileStream("netstackdump_read", FileMode.CreateNew, FileAccess.Write));
-        }
-
-        [Conditional("DEBUG")]
-        private void close_dump_file()
-        {
-            if (_netStackDump != null)
-            {
-                _netStackDump.Close();
-            }
-
-            if (_netStackDumpRead != null)
-            {
-                _netStackDumpRead.Close();
-            }
-        }
-
-        private void sigIntHandler(object sender, ConsoleCancelEventArgs e)
-        {
-            RTMP.RTMP_ctrlC = true;
-            var sig = 2; // SIGINT = 2; man 7 signal, POSIX.1-1990 ?
-            Log.RTMP_LogPrintf("Caught signal: {0}, cleaning up, just a second...\n", sig);
-            if (rtmpServer != null)
-            {
-                stopStreaming(rtmpServer);
-            }
-        }
-
+        /// <summary> STREAMING_SERVER.state </summary>
         private enum STREAMING_STATUS
         {
             STREAMING_ACCEPTING,
@@ -182,8 +64,19 @@ namespace rtmpsuck
             STREAMING_STOPPED
         };
 
+        /// <summary> struct Flist </summary>
+        private class Flist
+        {
+            /// <summary> FILE *f_file; </summary>
+            public object f_file;
+
+            /// <summary> AVal f_path; </summary>
+            public AVal f_path;
+        }
+
         private STREAMING_SERVER rtmpServer;
 
+        /// <summary> struct STREAMING_SERVER </summary>
         private class STREAMING_SERVER
         {
             /// <summary> int state </summary>
@@ -221,155 +114,50 @@ namespace rtmpsuck
             }
         }
 
+        private const int BUFFERTIME = 4 * 60 * 60 * 1000; // 4 hours in ms
+
+        private readonly AVal av_app = AVal.AVC("app");
+        private readonly AVal av_connect = AVal.AVC("connect");
+        private readonly AVal av_flashVer = AVal.AVC("flashVer");
+        private readonly AVal av_swfUrl = AVal.AVC("swfUrl");
+        private readonly AVal av_pageUrl = AVal.AVC("pageUrl");
+        private readonly AVal av_tcUrl = AVal.AVC("tcUrl");
+        private readonly AVal av_fpad = AVal.AVC("fpad");
+        private readonly AVal av_capabilities = AVal.AVC("capabilities");
+        private readonly AVal av_audioCodecs = AVal.AVC("audioCodecs");
+        private readonly AVal av_videoCodecs = AVal.AVC("videoCodecs");
+        private readonly AVal av_videoFunction = AVal.AVC("videoFunction");
+        private readonly AVal av_objectEncoding = AVal.AVC("objectEncoding");
+        private readonly AVal av__result = AVal.AVC("_result");
+        private readonly AVal av_createStream = AVal.AVC("createStream");
+        private readonly AVal av_play = AVal.AVC("play");
+        private readonly AVal av_closeStream = AVal.AVC("closeStream");
+        private readonly AVal av_fmsVer = AVal.AVC("fmsVer");
+        private readonly AVal av_mode = AVal.AVC("mode");
+        private readonly AVal av_level = AVal.AVC("level");
+        private readonly AVal av_code = AVal.AVC("code");
+        private readonly AVal av_secureToken = AVal.AVC("secureToken");
+        private readonly AVal av_onStatus = AVal.AVC("onStatus");
+        private readonly AVal av_close = AVal.AVC("close");
+        private readonly AVal av_NetStream_Failed = AVal.AVC("NetStream.Failed");
+        private readonly AVal av_NetStream_Play_Failed = AVal.AVC("NetStream.Play.Failed");
+        private readonly AVal av_NetStream_Play_StreamNotFound = AVal.AVC("NetStream.Play.StreamNotFound");
+        private readonly AVal av_NetConnection_Connect_InvalidApp = AVal.AVC("NetConnection.Connect.InvalidApp");
+        private readonly AVal av_NetStream_Play_Start = AVal.AVC("NetStream.Play.Start");
+        private readonly AVal av_NetStream_Play_Complete = AVal.AVC("NetStream.Play.Complete");
+        private readonly AVal av_NetStream_Play_Stop = AVal.AVC("NetStream.Play.Stop");
+
+        private readonly string[] _cst = { "client", "server" };
+
         /// <summary>
-        /// struct Flist
+        /// Returns 0 for OK/Failed/error, 1 for 'Stop or Complete'
+        /// int ServeInvoke(STREAMING_SERVER *server, int which, RTMPPacket *pack, const char *body)
         /// </summary>
-        private class Flist
-        {
-            /// <summary> FILE *f_file; </summary>
-            public object f_file;
-
-            /// <summary> AVal f_path; </summary>
-            public AVal f_path;
-        }
-
-        private void doServe(STREAMING_SERVER server)
-        {
-            uint buflen = 131072;
-            bool paused = false;
-            var sock = server.socket;
-
-            server.state = STREAMING_STATUS.STREAMING_IN_PROGRESS;
-            if (sock.Poll(5000, SelectMode.SelectRead))
-            {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request");
-                // goto quit;
-            }
-            else
-            {
-                RTMP.RTMP_Init(server.rs);
-                RTMP.RTMP_Init(server.rc);
-                server.rs.m_sb.sb_socket = sock;
-                if (!RTMP.RTMP_Serve(server.rs))
-                {
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Handshake failed.");
-                    // goto cleanup;
-                }
-                else
-                {
-                    var ps = new RTMPPacket();
-                    while (RTMP.RTMP_IsConnected(server.rs)
-                           && RTMP.RTMP_ReadPacket(server.rs, out ps))
-                    {
-                        if (!ps.IsReady())
-                        {
-                            continue;
-                        }
-
-                        ServePacket(server, 0, ps);
-                        ps.Free();
-                        if (RTMP.RTMP_IsConnected(server.rc))
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        private string[] cst = { "client", "server" };
-
-        private int ServePacket(STREAMING_SERVER server, int which, RTMPPacket packet)
-        {
-            var __FUNCTION__ = "ServePacket";
-            int ret = 0;
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
-                "{0}, {1} sent packet type {2:2x}, size {3} bytes",
-                __FUNCTION__, cst[which], packet.PacketType, packet.BodySize);
-            switch (packet.PacketType)
-            {
-                case RTMPPacket.RTMP_PACKET_TYPE_CHUNK_SIZE:
-                    // chunk size
-                    //      HandleChangeChunkSize(r, packet);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_BYTES_READ_REPORT:
-                    // bytes read report
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_CONTROL:
-                    // ctrl
-                    //      HandleCtrl(r, packet);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_SERVER_BW:
-                    // server bw
-                    //      HandleServerBW(r, packet);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_CLIENT_BW:
-                    // client bw
-                    //     HandleClientBW(r, packet);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_AUDIO:
-                    // audio data
-                    //RTMP_Log(RTMP_LOGDEBUG, "%s, received: audio %lu bytes", __FUNCTION__, packet.m_nBodySize);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_VIDEO:
-                    // video data
-                    //RTMP_Log(RTMP_LOGDEBUG, "%s, received: video %lu bytes", __FUNCTION__, packet.m_nBodySize);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_FLEX_STREAM_SEND:
-                    // flex stream send
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_FLEX_SHARED_OBJECT:
-                    // flex shared object
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_FLEX_MESSAGE:
-                    // flex message
-                    {
-                        ret = ServeInvoke(server, which, packet, packet.Body.Skip(1).ToArray());
-                        break;
-                    }
-                case RTMPPacket.RTMP_PACKET_TYPE_INFO:
-                    // metadata (notify)
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_SHARED_OBJECT:
-                    /* shared object */
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_INVOKE:
-                    // invoke
-                    ret = ServeInvoke(server, which, packet, packet.Body);
-                    break;
-
-                case RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO:
-                    /* flv */
-                    break;
-
-                default:
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, unknown packet type received: 0x{1:02x}", __FUNCTION__, packet.PacketType);
-                    serverPacket_Dump(packet);
-                    break;
-            }
-
-            return ret;
-        }
-
-        [Conditional("DEBUG")]
-        private void serverPacket_Dump(RTMPPacket packet)
-        {
-            Log.RTMP_LogHex(Log.RTMP_LogLevel.RTMP_LOGDEBUG, packet.Body, packet.BodySize);
-        }
-
-        // Returns 0 for OK/Failed/error, 1 for 'Stop or Complete'
-        // int ServeInvoke(STREAMING_SERVER *server, int which, RTMPPacket *pack, const char *body)
+        /// <param name="server"></param>
+        /// <param name="which"></param>
+        /// <param name="pack"></param>
+        /// <param name="body"></param>
+        /// <returns></returns>
         private int ServeInvoke(STREAMING_SERVER server, int which, RTMPPacket pack, byte[] body)
         {
             var __FUNCTION__ = "ServeInvoke";
@@ -397,7 +185,7 @@ namespace rtmpsuck
             AMFObject.AMF_Dump(obj);
             AVal method;
             AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(obj, null, 0), out method);
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, {1} invoking <{2}>", __FUNCTION__, cst[which], method.av_val);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, {1} invoking <{2}>", __FUNCTION__, _cst[which], method.av_val);
             int ret = 0;
             if (AVal.Match(method, av_connect))
             {
@@ -671,6 +459,187 @@ namespace rtmpsuck
             return ret;
         }
 
+        /// <summary>
+        /// int ServePacket(STREAMING_SERVER *server, int which, RTMPPacket *packet)
+        /// </summary>
+        /// <param name="server"></param>
+        /// <param name="which"></param>
+        /// <param name="packet"></param>
+        /// <returns></returns>
+        private int ServePacket(STREAMING_SERVER server, int which, RTMPPacket packet)
+        {
+            var __FUNCTION__ = "ServePacket";
+            int ret = 0;
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                "{0}, {1} sent packet type {2:2x}, size {3} bytes",
+                __FUNCTION__, _cst[which], packet.PacketType, packet.BodySize);
+            switch (packet.PacketType)
+            {
+                case RTMPPacket.RTMP_PACKET_TYPE_CHUNK_SIZE:
+                    // chunk size
+                    //      HandleChangeChunkSize(r, packet);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_BYTES_READ_REPORT:
+                    // bytes read report
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_CONTROL:
+                    // ctrl
+                    //      HandleCtrl(r, packet);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_SERVER_BW:
+                    // server bw
+                    //      HandleServerBW(r, packet);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_CLIENT_BW:
+                    // client bw
+                    //     HandleClientBW(r, packet);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_AUDIO:
+                    // audio data
+                    //RTMP_Log(RTMP_LOGDEBUG, "%s, received: audio %lu bytes", __FUNCTION__, packet.m_nBodySize);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_VIDEO:
+                    // video data
+                    //RTMP_Log(RTMP_LOGDEBUG, "%s, received: video %lu bytes", __FUNCTION__, packet.m_nBodySize);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_FLEX_STREAM_SEND:
+                    // flex stream send
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_FLEX_SHARED_OBJECT:
+                    // flex shared object
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_FLEX_MESSAGE:
+                    // flex message
+                    {
+                        ret = ServeInvoke(server, which, packet, packet.Body.Skip(1).ToArray());
+                        break;
+                    }
+                case RTMPPacket.RTMP_PACKET_TYPE_INFO:
+                    // metadata (notify)
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_SHARED_OBJECT:
+                    /* shared object */
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_INVOKE:
+                    // invoke
+                    ret = ServeInvoke(server, which, packet, packet.Body);
+                    break;
+
+                case RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO:
+                    /* flv */
+                    break;
+
+                default:
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, unknown packet type received: 0x{1:02x}", __FUNCTION__, packet.PacketType);
+                    serverPacket_Dump(packet);
+                    break;
+            }
+
+            return ret;
+        }
+
+        /// <summary>
+        /// not completed
+        /// int  WriteStream(
+        ///  char **buf,	// target pointer, maybe preallocated
+        ///  unsigned int *plen,	// length of buffer if preallocated
+        ///  uint32_t *nTimeStamp,
+        ///  RTMPPacket *packet)
+        /// </summary>
+        /// <returns></returns>
+        private int WriteStream()
+        {
+            return 1;
+        }
+
+        /// <summary>
+        /// TFTYPE controlServerThread(void *unused)
+        /// </summary>
+        private void controlServerThread()
+        {
+            while (true)
+            {
+                var ich = Console.ReadKey();
+                switch (ich.KeyChar)
+                {
+                    case 'q':
+                        Log.RTMP_LogPrintf("Exiting\n");
+                        stopStreaming(rtmpServer);
+                        Environment.Exit(0); // FIXME: more portable.
+                        break;
+
+                    default:
+                        Log.RTMP_LogPrintf("Unknown command '{0}', ignoring\n", ich.KeyChar);
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// not completed
+        /// TFTYPE doServe(void *arg)
+        /// server socket and state (our listening socket)
+        /// </summary>
+        /// <param name="server"></param>
+        private void doServe(STREAMING_SERVER server)
+        {
+            uint buflen = 131072;
+            bool paused = false;
+            var sock = server.socket;
+
+            server.state = STREAMING_STATUS.STREAMING_IN_PROGRESS;
+            if (sock.Poll(5000, SelectMode.SelectRead))
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request");
+                // goto quit;
+            }
+            else
+            {
+                RTMP.RTMP_Init(server.rs);
+                RTMP.RTMP_Init(server.rc);
+                server.rs.m_sb.sb_socket = sock;
+                if (!RTMP.RTMP_Serve(server.rs))
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Handshake failed.");
+                    // goto cleanup;
+                }
+                else
+                {
+                    var ps = new RTMPPacket();
+                    while (RTMP.RTMP_IsConnected(server.rs)
+                           && RTMP.RTMP_ReadPacket(server.rs, out ps))
+                    {
+                        if (!ps.IsReady())
+                        {
+                            continue;
+                        }
+
+                        ServePacket(server, 0, ps);
+                        ps.Free();
+                        if (RTMP.RTMP_IsConnected(server.rc))
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// TFTYPE serverThread(void *arg)
+        /// </summary>
+        /// <param name="server"></param>
         private void serverThread(STREAMING_SERVER server)
         {
             var __FUNCTION__ = "serverThread";
@@ -694,6 +663,12 @@ namespace rtmpsuck
             server.state = STREAMING_STATUS.STREAMING_STOPPED;
         }
 
+        /// <summary>
+        /// STREAMING_SERVER * startStreaming(const char *address, int port)
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
         private STREAMING_SERVER startStreaming(string address, int port)
         {
             var __FUNCTION__ = "startStreaming";
@@ -753,6 +728,10 @@ namespace rtmpsuck
             return server;
         }
 
+        /// <summary>
+        /// void stopStreaming(STREAMING_SERVER * server)
+        /// </summary>
+        /// <param name="server"></param>
         private void stopStreaming(STREAMING_SERVER server)
         {
             Debug.Assert(server != null);
@@ -780,44 +759,115 @@ namespace rtmpsuck
             }
         }
 
-        private readonly AVal av_app = AVC("app");
-        private readonly AVal av_connect = AVC("connect");
-        private readonly AVal av_flashVer = AVC("flashVer");
-        private readonly AVal av_swfUrl = AVC("swfUrl");
-        private readonly AVal av_pageUrl = AVC("pageUrl");
-        private readonly AVal av_tcUrl = AVC("tcUrl");
-        private readonly AVal av_fpad = AVC("fpad");
-        private readonly AVal av_capabilities = AVC("capabilities");
-        private readonly AVal av_audioCodecs = AVC("audioCodecs");
-        private readonly AVal av_videoCodecs = AVC("videoCodecs");
-        private readonly AVal av_videoFunction = AVC("videoFunction");
-        private readonly AVal av_objectEncoding = AVC("objectEncoding");
-        private readonly AVal av__result = AVC("_result");
-        private readonly AVal av_createStream = AVC("createStream");
-        private readonly AVal av_play = AVC("play");
-        private readonly AVal av_closeStream = AVC("closeStream");
-        private readonly AVal av_fmsVer = AVC("fmsVer");
-        private readonly AVal av_mode = AVC("mode");
-        private readonly AVal av_level = AVC("level");
-        private readonly AVal av_code = AVC("code");
-        private readonly AVal av_secureToken = AVC("secureToken");
-        private readonly AVal av_onStatus = AVC("onStatus");
-        private readonly AVal av_close = AVC("close");
-        private readonly AVal av_NetStream_Failed = AVC("NetStream.Failed");
-        private readonly AVal av_NetStream_Play_Failed = AVC("NetStream.Play.Failed");
-        private readonly AVal av_NetStream_Play_StreamNotFound = AVC("NetStream.Play.StreamNotFound");
-        private readonly AVal av_NetConnection_Connect_InvalidApp = AVC("NetConnection.Connect.InvalidApp");
-        private readonly AVal av_NetStream_Play_Start = AVC("NetStream.Play.Start");
-        private readonly AVal av_NetStream_Play_Complete = AVC("NetStream.Play.Complete");
-        private readonly AVal av_NetStream_Play_Stop = AVC("NetStream.Play.Stop");
-
-        private static AVal AVC(string str)
+        /// <summary> void sigIntHandler(int sig) </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void sigIntHandler(object sender, ConsoleCancelEventArgs e)
         {
-            return new AVal
+            RTMP.RTMP_ctrlC = true;
+            var sig = 2; // SIGINT = 2; man 7 signal, POSIX.1-1990 ?
+            Log.RTMP_LogPrintf("Caught signal: {0}, cleaning up, just a second...\n", sig);
+            if (rtmpServer != null)
             {
-                av_len = str.Length,
-                av_val = str.ToCharArray().Select(c => (byte)c).ToArray()
-            };
+                stopStreaming(rtmpServer);
+            }
+        }
+
+        /// <summary> rtmpsuck.c main() </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
+        public RD_STATUS Run(string[] args)
+        {
+            var nStatus = RD_STATUS.RD_SUCCESS;
+            const string DEFAULT_RTMP_STREAMING_DEVICE = "0.0.0.0";
+            var rtmpStreamingDevice = DEFAULT_RTMP_STREAMING_DEVICE;
+            var nRtmpStreamingPort = 1935;
+
+            const string RTMPDUMP_VERSION = "v2.4"; // TODO:
+            Log.RTMP_LogPrintf("RTMP Proxy Server {0}\n", RTMPDUMP_VERSION);
+            Log.RTMP_LogPrintf("(c) 2010 Andrej Stepanchuk, Howard Chu; license: GPL\n\n");
+            Log.RTMP_LogSetLevel(Log.RTMP_LogLevel.RTMP_LOGINFO);
+
+            if (args.Length > 0 && args[0] == "-z")
+            {
+                Log.RTMP_LogSetLevel(Log.RTMP_LogLevel.RTMP_LOGALL);
+            }
+
+            Console.CancelKeyPress += sigIntHandler;
+            // TODO: signal(SIGPIPE, SIG_IGN);
+
+            open_dump_file();
+
+            // InitSocket();
+
+            ThreadCreate(controlServerThread);
+            rtmpServer = startStreaming(rtmpStreamingDevice, nRtmpStreamingPort);
+            if (rtmpServer == null)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Failed to start RTMP server, exiting!");
+                return RD_STATUS.RD_FAILED;
+            }
+
+            Log.RTMP_LogPrintf("Streaming on rtmp://{0}:{1}\n", rtmpStreamingDevice, nRtmpStreamingPort);
+            while (rtmpServer.state != STREAMING_STATUS.STREAMING_STOPPED)
+            {
+                Thread.Sleep(1000);
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Done, extiting...");
+
+            // CleanupSockets();
+
+            close_dump_file();
+
+            return nStatus;
+        }
+
+        #region thread.h/thread.c
+
+        private void ThreadCreate(Action func)
+        {
+            new Thread(() => func()).Start();
+        }
+
+        private void ThreadCreate<T>(Action<T> func, T arg)
+        {
+            new Thread(() => func(arg)).Start();
+        }
+
+        #endregion
+
+        // TODO: C#-style resource handling
+
+        private BinaryWriter _netStackDump;
+
+        private BinaryWriter _netStackDumpRead;
+
+        [Conditional("DEBUG")]
+        private void open_dump_file()
+        {
+            _netStackDump = new BinaryWriter(new FileStream("netstackdump", FileMode.CreateNew, FileAccess.Write));
+            _netStackDumpRead = new BinaryWriter(new FileStream("netstackdump_read", FileMode.CreateNew, FileAccess.Write));
+        }
+
+        [Conditional("DEBUG")]
+        private void close_dump_file()
+        {
+            if (_netStackDump != null)
+            {
+                _netStackDump.Close();
+            }
+
+            if (_netStackDumpRead != null)
+            {
+                _netStackDumpRead.Close();
+            }
+        }
+
+        [Conditional("DEBUG")]
+        private void serverPacket_Dump(RTMPPacket packet)
+        {
+            Log.RTMP_LogHex(Log.RTMP_LogLevel.RTMP_LOGDEBUG, packet.Body, packet.BodySize);
         }
     }
 }

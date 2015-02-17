@@ -31,6 +31,8 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Security;
 using System.Threading;
 using librtmp;
@@ -85,7 +87,7 @@ namespace rtmpsuck
             /// <summary> int socket </summary>
             public Socket socket { get; set; }
 
-            /// <summary> uint32_t stamp </summary>
+            /// <summary> uint stamp </summary>
             public uint stamp { get; set; }
 
             /// <summary> RTMP rs </summary>
@@ -501,12 +503,12 @@ namespace rtmpsuck
 
                 case RTMPPacket.RTMP_PACKET_TYPE_AUDIO:
                     // audio data
-                    //RTMP_Log(RTMP_LOGDEBUG, "%s, received: audio %lu bytes", __FUNCTION__, packet.m_nBodySize);
+                    //RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, received: audio %lu bytes", __FUNCTION__, packet.BodySize);
                     break;
 
                 case RTMPPacket.RTMP_PACKET_TYPE_VIDEO:
                     // video data
-                    //RTMP_Log(RTMP_LOGDEBUG, "%s, received: video %lu bytes", __FUNCTION__, packet.m_nBodySize);
+                    //RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, received: video %lu bytes", __FUNCTION__, packet.BodySize);
                     break;
 
                 case RTMPPacket.RTMP_PACKET_TYPE_FLEX_STREAM_SEND:
@@ -554,13 +556,187 @@ namespace rtmpsuck
         /// int  WriteStream(
         ///  char **buf,	// target pointer, maybe preallocated
         ///  unsigned int *plen,	// length of buffer if preallocated
-        ///  uint32_t *nTimeStamp,
+        ///  uint *nTimeStamp,
         ///  RTMPPacket *packet)
         /// </summary>
         /// <returns></returns>
-        private int WriteStream()
+        private int WriteStream(byte[] buf, uint plen, uint nTimeStamp, RTMPPacket packet)
         {
-            return 1;
+            uint prevTagSize = 0;
+            int ret = -1;
+            int len = (int)plen; // *plen;
+
+            while (true)
+            {
+                byte[] packetBody = packet.Body;
+                uint nPacketLen = packet.BodySize;
+
+                // skip video info/command packets
+                if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO
+                    && nPacketLen == 2
+                    && ((packetBody[0] & 0xf0) == 0x50))
+                {
+                    ret = 0;
+                    break;
+                }
+
+                if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO && nPacketLen <= 5)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "ignoring too small video packet: size: {0}", nPacketLen);
+                    ret = 0;
+                    break;
+                }
+
+                if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_AUDIO && nPacketLen <= 1)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "ignoring too small audio packet: size: %d", nPacketLen);
+                    ret = 0;
+                    break;
+                }
+
+                // ifdef _DEBUG
+                if (false)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "type: {0:2x}, size: {1}, TS: {2} ms", packet.PacketType, nPacketLen, packet.TimeStamp);
+                    if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO)
+                    {
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "frametype: {0:2x}", (packetBody[0] & 0xf0));
+                    }
+                }
+
+                // calculate packet size and reallocate buffer if necessary
+                uint size = nPacketLen +
+                            ((packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_AUDIO
+                              || packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO
+                              || packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_INFO) ? 11 : 0u)
+                            + (packet.PacketType != 0x16 ? 4 : 0u);
+
+                if (size + 4 > len)
+                {
+                    /* The extra 4 is for the case of an FLV stream without a last
+                     * prevTagSize (we need extra 4 bytes to append it).  */
+                    //*buf = (char*)realloc(*buf, size + 4);
+                    //if (*buf == 0)
+                    //{
+                    //    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't reallocate memory!");
+                    //    ret = -1; // fatal error
+                    //    break;
+                    //}
+                }
+                // char* ptr = *buf, *pend = ptr + size + 4;
+                uint ptr = 0, pend = size + 4;
+                /* audio (RTMP_PACKET_TYPE_AUDIO), video (RTMP_PACKET_TYPE_VIDEO)
+                 * or metadata (RTMP_PACKET_TYPE_INFO) packets: construct 11 byte
+                 * header then add rtmp packet's data.  */
+                if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_AUDIO
+                    || packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO
+                    || packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_INFO)
+                {
+                    // set data type
+                    //*dataType |= (((packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_AUDIO)<<2)|(packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO));
+
+                    // (*nTimeStamp) = packet.TimeStamp;
+                    nTimeStamp = packet.TimeStamp;
+                    prevTagSize = 11 + nPacketLen;
+
+                    // *ptr++ = packet.PacketType;
+                    buf[ptr] = packet.PacketType;
+                    ptr = (uint)AMF.AMF_EncodeInt24(buf, (int)nPacketLen);
+                    ptr = (uint)AMF.AMF_EncodeInt24(buf, (int)nTimeStamp);
+                    // *ptr = (char)(((*nTimeStamp) & 0xFF000000) >> 24);
+                    buf[ptr] = (byte)((nTimeStamp & 0xFF000000) >> 24);
+                    ptr++;
+
+                    // stream id
+                    ptr = (uint)AMF.AMF_EncodeInt24(buf, 0);
+                }
+
+                // memcpy(ptr, packetBody, nPacketLen);
+                uint ulen = nPacketLen;
+
+                // correct tagSize and obtain timestamp if we have an FLV stream
+                if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO)
+                {
+                    uint pos = 0;
+
+                    while (pos + 11 < nPacketLen)
+                    {
+                        uint dataSize = (uint)AMF.AMF_DecodeInt24(packetBody.Skip((int)pos + 1).ToArray()); // size without header (11) and without prevTagSize (4)
+                        nTimeStamp = (uint)AMF.AMF_DecodeInt24(packetBody.Skip((int)pos + 4).ToArray());
+                        nTimeStamp |= (uint)(packetBody[pos + 7] << 24);
+
+                        if (pos + 11 + dataSize + 4 > nPacketLen)
+                        {
+                            if (pos + 11 + dataSize > nPacketLen)
+                            {
+                                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Wrong data size ({0}), stream corrupted, aborting!", dataSize);
+                                ret = -2;
+                                break;
+                            }
+
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "No tagSize found, appending!");
+
+                            // we have to append a last tagSize!
+                            prevTagSize = dataSize + 11;
+                            // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);
+                            AMF.AMF_EncodeInt32(buf, (int)prevTagSize);
+                            size += 4;
+                            ulen += 4;
+                        }
+                        else
+                        {
+                            prevTagSize = AMF.AMF_DecodeInt32(packetBody.Skip((int)pos + 11 + (int)dataSize).ToArray());
+
+                            // #ifdef _DEBUG
+                            if (false)
+                            {
+                                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                                    "FLV Packet: type {0:2x}, dataSize: {1}, tagSize: {2}, timeStamp: {3} ms",
+                                    packetBody[pos], dataSize, prevTagSize, nTimeStamp);
+                            }
+                            // #endif
+
+                            if (prevTagSize != (dataSize + 11))
+                            {
+                                // #ifdef _DEBUG
+                                if (false)
+                                {
+                                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
+                                      "Tag and data size are not consitent, writing tag size according to dataSize+11: {1}",
+                                      dataSize + 11);
+                                }
+                                // #endif
+
+                                prevTagSize = dataSize + 11;
+                                // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);
+                                AMF.AMF_EncodeInt32(buf, (int)prevTagSize);
+                            }
+                        }
+
+                        pos += prevTagSize + 4; //(11+dataSize+4);
+                    }
+                }
+
+                ptr += ulen;
+
+                if (packet.PacketType != RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO)
+                {
+                    // FLV tag packets contain their own prevTagSize
+                    // AMF.AMF_EncodeInt32(ptr, pend, prevTagSize);
+                    AMF.AMF_EncodeInt32(buf, (int)prevTagSize);
+                    //ptr += 4;
+                }
+
+                ret = (int)size;
+                break;
+            }
+
+            if (len > plen)
+            {
+                plen = (uint)len;
+            }
+
+            return ret; // no more media packets
         }
 
         /// <summary>
@@ -587,13 +763,13 @@ namespace rtmpsuck
         }
 
         /// <summary>
-        /// not completed
         /// TFTYPE doServe(void *arg)
         /// server socket and state (our listening socket)
         /// </summary>
         /// <param name="server"></param>
         private void doServe(STREAMING_SERVER server)
         {
+            var __FUNCTION__ = "doServe";
             uint buflen = 131072;
             bool paused = false;
             var sock = server.socket;
@@ -602,38 +778,271 @@ namespace rtmpsuck
             if (sock.Poll(5000, SelectMode.SelectRead))
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request");
-                // goto quit;
+
+                goto quit;
             }
-            else
+
+            RTMP.RTMP_Init(server.rs);
+            RTMP.RTMP_Init(server.rc);
+            server.rs.m_sb.sb_socket = sock;
+            if (!RTMP.RTMP_Serve(server.rs))
             {
-                RTMP.RTMP_Init(server.rs);
-                RTMP.RTMP_Init(server.rc);
-                server.rs.m_sb.sb_socket = sock;
-                if (!RTMP.RTMP_Serve(server.rs))
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Handshake failed.");
+                goto cleanup;
+            }
+
+            RTMPPacket ps;
+            while (RTMP.RTMP_IsConnected(server.rs)
+                   && RTMP.RTMP_ReadPacket(server.rs, out ps))
+            {
+                if (!ps.IsReady())
                 {
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Handshake failed.");
-                    // goto cleanup;
+                    continue;
+                }
+
+                ServePacket(server, 0, ps);
+                ps.Free();
+                if (RTMP.RTMP_IsConnected(server.rc))
+                {
+                    break;
+                }
+            }
+
+            var buf = new byte[0];
+            var rk = new List<RTMPChunk>();
+            RTMPPacket pc = new RTMPPacket { Chunk = rk };
+            server.rc.Link.timeout = 10;
+            server.rs.Link.timeout = 10;
+            while (RTMP.RTMP_IsConnected(server.rs) || RTMP.RTMP_IsConnected(server.rc))
+            {
+                var cr = server.rc.m_sb.sb_size;
+                var sr = server.rs.m_sb.sb_size;
+                if (cr != 0 || sr != 0)
+                {
                 }
                 else
                 {
-                    var ps = new RTMPPacket();
-                    while (RTMP.RTMP_IsConnected(server.rs)
-                           && RTMP.RTMP_ReadPacket(server.rs, out ps))
-                    {
-                        if (!ps.IsReady())
-                        {
-                            continue;
-                        }
+                    // TODO: re-write to event driven code
+                    // polling socket is too difficult to port
 
-                        ServePacket(server, 0, ps);
-                        ps.Free();
-                        if (RTMP.RTMP_IsConnected(server.rc))
+                    var pollServer = RTMP.RTMP_IsConnected(server.rs);
+                    var pollClient = RTMP.RTMP_IsConnected(server.rc);
+                    /* give more time to start up if we're not playing yet */
+                    var timeout = server.f_cur != 0 ? 30 : 60;
+
+                    bool aliveServer = false, aliveClient = false;
+                    var are = new AutoResetEvent(false);
+                    new Thread(() =>
+                    {
+                        while (!aliveServer && !aliveClient)
                         {
+                            aliveClient = server.rc.m_sb.sb_socket.Poll(100, SelectMode.SelectRead);
+                            aliveServer = server.rs.m_sb.sb_socket.Poll(100, SelectMode.SelectRead);
+                        }
+                        are.Set();
+                    }).Start();
+                    if (!are.WaitOne(timeout * 1000))
+                    {
+                        if (server.f_cur != 0 && server.rc.m_mediaChannel != 0 && !paused)
+                        {
+                            server.rc.m_pauseStamp = (uint)server.rc.m_channelTimestamp[server.rc.m_mediaChannel];
+                            if (RTMP.RTMP_ToggleStream(server.rc))
+                            {
+                                paused = true;
+                                continue;
+                            }
+                        }
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request");
+
+                        goto cleanup;
+                    }
+
+                    if (aliveServer)
+                    {
+                        sr = 1;
+                    }
+
+                    if (aliveClient)
+                    {
+                        cr = 1;
+                    }
+                }
+
+                if (sr != 0)
+                {
+                    while (RTMP.RTMP_ReadPacket(server.rs, out ps))
+                    {
+                        if (ps.IsReady())
+                        {
+                            if (ps.PacketType == RTMPPacket.RTMP_PACKET_TYPE_CHUNK_SIZE)
+                            {
+                                /* change chunk size */
+                                if (ps.BodySize >= 4)
+                                {
+                                    server.rs.m_inChunkSize = (int)AMF.AMF_DecodeInt32(ps.Body);
+                                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, client: chunk size change to {1}", __FUNCTION__, server.rs.m_inChunkSize);
+                                    server.rc.m_outChunkSize = server.rs.m_inChunkSize;
+                                }
+                            }
+                            else if (ps.PacketType == RTMPPacket.RTMP_PACKET_TYPE_BYTES_READ_REPORT)
+                            {
+                                /* bytes received */
+                                if (ps.BodySize >= 4)
+                                {
+                                    int count = (int)AMF.AMF_DecodeInt32(ps.Body);
+                                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, client: bytes received = %d", __FUNCTION__, count);
+                                }
+                            }
+                            /* ctrl */
+                            else if (ps.PacketType == RTMPPacket.RTMP_PACKET_TYPE_CONTROL)
+                            {
+                                short nType = (short)AMF.AMF_DecodeInt16(ps.Body);
+                                /* UpdateBufferMS */
+                                if (nType == 0x03)
+                                {
+                                    // char* ptr = ps.Body + 2;
+                                    var id = (int)AMF.AMF_DecodeInt32(ps.Body.Skip(2).ToArray());
+                                    /* Assume the interesting media is on a non-zero stream */
+                                    if (id != 0)
+                                    {
+                                        var len = (int)AMF.AMF_DecodeInt32(ps.Body.Skip(6).ToArray());
+                                        // #if 1
+                                        /* request a big buffer */
+                                        if (len < BUFFERTIME)
+                                        {
+                                            // TODO:
+                                            // AMF.AMF_EncodeInt32(ptr + 4, ptr + 8, BUFFERTIME);
+                                            AMF.AMF_EncodeInt32(null, BUFFERTIME);
+                                        }
+
+                                        // #endif
+                                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, client: BufferTime change in stream {1} to {2}", __FUNCTION__, id, len);
+                                    }
+                                }
+                            }
+                            else if (ps.PacketType == RTMPPacket.RTMP_PACKET_TYPE_FLEX_MESSAGE
+                                     || ps.PacketType == RTMPPacket.RTMP_PACKET_TYPE_INVOKE)
+                            {
+                                if (ServePacket(server, 0, ps) != 0 && server.f_cur != 0)
+                                {
+                                    // TODO:
+                                    // fclose(server.f_head[server.f_cur].f_file);
+                                    server.f_head[server.f_cur].f_file = null;
+                                    server.f_cur = 0;
+                                }
+                            }
+
+                            RTMP.RTMP_SendPacket(server.rc, ps, false);
+                            // RTMPPacket.RTMPPacket_Free(ps);
+                            ps.Free();
                             break;
                         }
                     }
                 }
+
+                if (cr != 0)
+                {
+                    while (RTMP.RTMP_ReadPacket(server.rc, out pc))
+                    {
+                        int sendit = 1;
+                        if (pc.IsReady())
+                        {
+                            if (paused)
+                            {
+                                if (pc.TimeStamp <= server.rc.m_mediaStamp)
+                                {
+                                    continue;
+                                }
+
+                                paused = false;
+                                server.rc.m_pausing = 0;
+                            }
+                            /* change chunk size */
+                            if (pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_CHUNK_SIZE)
+                            {
+                                if (pc.BodySize >= 4)
+                                {
+                                    server.rc.m_inChunkSize = (int)AMF.AMF_DecodeInt32(pc.Body);
+                                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, server: chunk size change to {1}", __FUNCTION__, server.rc.m_inChunkSize);
+                                    server.rs.m_outChunkSize = server.rc.m_inChunkSize;
+                                }
+                            }
+                            else if (pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_CONTROL)
+                            {
+                                short nType = (short)AMF.AMF_DecodeInt16(pc.Body);
+                                /* SWFverification */
+                                if (nType == 0x1a)
+                                    // #ifdef CRYPTO
+                                    if (server.rc.Link.SWFSize != 0)
+                                    {
+                                        RTMP.RTMP_SendCtrl(server.rc, 0x1b, 0, 0);
+                                        sendit = 0;
+                                    }
+                                // #else
+                                /* The session will certainly fail right after this */
+                                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, server requested SWF verification, need CRYPTO support! ", __FUNCTION__);
+                                // #endif
+                            }
+                            else if (server.f_cur != 0
+                                && (pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_AUDIO
+                                || pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO
+                                || pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_INFO
+                                || pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO)
+                                && RTMP.RTMP_ClientPacket(server.rc, pc) != 0)
+                            {
+                                int len = WriteStream(buf, buflen, server.stamp, pc);
+                                if (len > 0)
+                                {
+                                    // TODO: fwrite!!
+                                    // if (fwrite(buf, 1, len, server.f_cur.f_file) != len)
+                                    {
+                                        goto cleanup;
+                                    }
+                                }
+                            }
+                            else if (pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_FLEX_MESSAGE ||
+                                     pc.PacketType == RTMPPacket.RTMP_PACKET_TYPE_INVOKE)
+                            {
+                                if (ServePacket(server, 1, pc) != 0 && server.f_cur != 0)
+                                {
+                                    // TODO:
+                                    // fclose(server.f_cur.f_file);
+                                    server.f_head[server.f_cur].f_file = null;
+                                    server.f_cur = 0;
+                                }
+                            }
+                        }
+                        if (sendit != 0 && RTMP.RTMP_IsConnected(server.rs))
+                        {
+                            // TODO: RTMPChunk!!
+                            RTMP.RTMP_SendChunk(server.rs, rk[0]);
+                        }
+
+                        if (pc.IsReady())
+                        {
+                            pc.Free();
+                        }
+
+                        break;
+                    }
+                }
+
+                if (!RTMP.RTMP_IsConnected(server.rs) && RTMP.RTMP_IsConnected(server.rc) && server.f_cur == 0)
+                {
+                    RTMP.RTMP_Close(server.rc);
+                }
             }
+
+        cleanup:
+
+        quit:
+
+            if (server.state == STREAMING_STATUS.STREAMING_IN_PROGRESS)
+            {
+                server.state = STREAMING_STATUS.STREAMING_ACCEPTING;
+            }
+
+            return;
         }
 
         /// <summary>

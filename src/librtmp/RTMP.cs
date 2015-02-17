@@ -50,7 +50,7 @@ namespace librtmp
         public static bool RTMP_ctrlC { get; set; } // rtmp.c global, not struct RTMP member
 
         /// <summary> int m_inChunkSize; </summary>
-        public int m_inChungSize { get; set; }
+        public int m_inChunkSize { get; set; }
 
         /// <summary> int m_outChunkSize; </summary>
         public int m_outChunkSize { get; set; }
@@ -204,8 +204,18 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        // int RTMP_SendPacket(RTMP *r, RTMPPacket *packet, int queue);
-        // int RTMP_SendChunk(RTMP *r, RTMPChunk *chunk);
+        /// <summary> int RTMP_SendPacket(RTMP *r, RTMPPacket *packet, int queue);</summary>
+        public static bool RTMP_SendPacket(RTMP r, RTMPPacket p, bool queue)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> int RTMP_SendChunk(RTMP *r, RTMPChunk *chunk); </summary>
+        public static bool RTMP_SendChunk(RTMP r, RTMPChunk c)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary> int RTMP_IsConnected(RTMP *r); </summary>
         public static bool RTMP_IsConnected(RTMP r)
         {
@@ -216,12 +226,20 @@ namespace librtmp
         // int RTMP_IsTimedout(RTMP *r);
         // double RTMP_GetDuration(RTMP *r);
         // int RTMP_ToggleStream(RTMP *r);
+        public static bool RTMP_ToggleStream(RTMP r)
+        {
+            throw new NotImplementedException();
+        }
 
         // int RTMP_ConnectStream(RTMP *r, int seekTime);
         // int RTMP_ReconnectStream(RTMP *r, int seekTime);
         // void RTMP_DeleteStream(RTMP *r);
         // int RTMP_GetNextMediaPacket(RTMP *r, RTMPPacket *packet);
-        // int RTMP_ClientPacket(RTMP *r, RTMPPacket *packet);
+        /// <summary> int RTMP_ClientPacket(RTMP *r, RTMPPacket *packet);</summary>
+        public static int RTMP_ClientPacket(RTMP r, RTMPPacket p)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary> void RTMP_Init(RTMP *r); </summary>
         public static void RTMP_Init(RTMP r)
@@ -245,7 +263,11 @@ namespace librtmp
         // int RTMP_LibVersion(void);
         // void RTMP_UserInterrupt(void);	/* user typed Ctrl-C */
 
-        // int RTMP_SendCtrl(RTMP *r, short nType, unsigned int nObject,unsigned int nTime);
+        /// <summary> int RTMP_SendCtrl(RTMP *r, short nType, unsigned int nObject,unsigned int nTime);</summary>
+        public static int RTMP_SendCtrl(RTMP r, short type, uint objCnt, uint times)
+        {
+            throw new NotImplementedException();
+        }
 
         /* caller probably doesn't know current timestamp, should just use RTMP_Pause instead */
         // int RTMP_SendPause(RTMP *r, int DoPause, int dTime);
@@ -354,8 +376,23 @@ namespace librtmp
     /// </summary>
     public class RTMPSockBuf
     {
-        // int sb_socket
+        /// <summary> int sb_socket </summary>
         public Socket sb_socket { get; set; }
+
+        // int sb_size;		/* number of unprocessed bytes in buffer */
+        public int sb_size { get; set; }
+
+        /// <summary> char *sb_start;		/* pointer into sb_pBuffer of next byte to process */ </summary>
+        public int sb_start { get; set; }
+
+        /// <summary> char sb_buf[RTMP_BUFFER_CACHE_SIZE];	/* data read from socket */ </summary>
+        public byte[] sb_buf { get; set; }
+
+        /// <summary> int sb_timedout; </summary>
+        public int sb_timedout { get; set; }
+
+        /// <summary> void *sb_ssl; </summary>
+        public object sb_ssl { get; set; }
     }
 
     /// <summary>

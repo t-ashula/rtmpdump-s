@@ -70,6 +70,56 @@ namespace librtmp
         AMF3_BYTE_ARRAY
     }
 
+    /// <summary> for amf.c global functions </summary>
+    public static class AMF
+    {
+        // char *AMF_EncodeString(char *output, char *outend, const AVal * str);
+        // char *AMF_EncodeNumber(char *output, char *outend, double dVal);
+        // char *AMF_EncodeInt16(char *output, char *outend, short nVal);
+        /// <summary>  char *AMF_EncodeInt24(char *output, char *outend, int nVal);</summary>
+
+        public static int AMF_EncodeInt24(byte[] output, int val)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> char* AMF_EncodeInt32(char* output, char* outend, int nVal); </summary>
+        public static int AMF_EncodeInt32(byte[] output, int val)
+        {
+            throw new NotImplementedException();
+        }
+
+        // char *AMF_EncodeBoolean(char *output, char *outend, int bVal);
+
+        /* Shortcuts for AMFProp_Encode */
+        // char *AMF_EncodeNamedString(char *output, char *outend, const AVal * name, const AVal * value);
+        // char *AMF_EncodeNamedNumber(char *output, char *outend, const AVal * name, double dVal);
+        // char *AMF_EncodeNamedBoolean(char *output, char *outend, const AVal * name, int bVal);
+
+        /// <summary> unsigned short AMF_DecodeInt16(const char *data);</summary>
+        public static ushort AMF_DecodeInt16(byte[] data)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> unsigned int AMF_DecodeInt24(const char *data);</summary>
+        public static int AMF_DecodeInt24(byte[] data)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> unsigned int AMF_DecodeInt32(const char *data);</summary>
+        public static uint AMF_DecodeInt32(byte[] data)
+        {
+            throw new NotImplementedException();
+        }
+
+        // void AMF_DecodeString(const char *data, AVal * str);
+        // void AMF_DecodeLongString(const char *data, AVal * str);
+        // int AMF_DecodeBoolean(const char *data);
+        // double AMF_DecodeNumber(const char *data);
+    }
+
     /// <summary> struct AVal; </summary>
     public class AVal
     {

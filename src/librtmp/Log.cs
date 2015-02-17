@@ -28,6 +28,7 @@ namespace librtmp
 {
     public class Log
     {
+        /// <summary> enum RTMP_logLevel; </summary>
         public enum RTMP_LogLevel
         {
             RTMP_LOGCRIT = 0,
@@ -39,9 +40,28 @@ namespace librtmp
             RTMP_LOGALL
         }
 
-        private static string loglevel_to_string(RTMP_LogLevel e)
+        /// <summary> typedef void (RTMP_LogCallback)(int level, const char *fmt, va_list); </summary>
+        public delegate void RTMP_LogCallback(RTMP_LogLevel level, string fmt, params object[] valist);
+
+        /// <summary> #define MAX_PRINT_LEN 2048 </summary>
+        private const int MAX_PRINT_LEN = 2048;
+
+        /// <summary> static int neednl </summary>
+        private static bool needNewLine;
+
+        /// <summary> static FILE* fmsg; </summary>
+        private static TextWriter fmsg;
+
+        /// <summary> RTMP_LogLevel RTMP_debuglevel = RTMP_LOGERROR; </summary>
+        private static RTMP_LogLevel RTMP_debuglevel = RTMP_LogLevel.RTMP_LOGERROR;
+
+        /// <summary> static RTMP_LogCallback  *cb = rtmp_log_default; </summary>
+        private static RTMP_LogCallback cb = rtmp_log_default;
+
+        /// <summary> static const char *levels[] = { "CRIT", "ERROR", "WARNING", "INFO", "DEBUG", "DEBUG2" }; </summary>
+        private static string loglevel_to_string(RTMP_LogLevel level)
         {
-            switch (e)
+            switch (level)
             {
                 case RTMP_LogLevel.RTMP_LOGCRIT:
                     return "CRIT";
@@ -66,93 +86,64 @@ namespace librtmp
             }
         }
 
-        /*
-         * extern RTMP_LogLevel RTMP_debuglevel;
-         * typedef void (RTMP_LogCallback)(int level, const char *fmt, va_list);
-         * void RTMP_LogSetCallback(RTMP_LogCallback *callback);
-         * void RTMP_LogSetOutput(FILE *file);
-         * void RTMP_LogPrintf(const char *format, ...);
-         * void RTMP_LogStatus(const char *format, ...);
-         * void RTMP_Log(int level, const char *format, ...);
-         * void RTMP_LogHex(int level, const uint8_t *data, unsigned long len);
-         * void RTMP_LogHexString(int level, const uint8_t *data, unsigned long len);
-         * void RTMP_LogSetLevel(RTMP_LogLevel lvl);
-         * RTMP_LogLevel RTMP_LogGetLevel(void);
-         */
+        /// <summary> static void rtmp_log_default(int level, const char *format, va_list vl) </summary>
+        private static void rtmp_log_default(RTMP_LogLevel level, string fmt, params object[] vals)
+        {
+            var msg = string.Format(fmt, vals);
+            /* Filter out 'no-name' */
+            if (RTMP_debuglevel < RTMP_LogLevel.RTMP_LOGALL && msg.Contains("no-name"))
+            {
+                return;
+            }
 
-        public delegate void RTMP_LogCallback(RTMP_LogLevel l, string fmr, params object[] v);
+            if (fmsg == null)
+            {
+                fmsg = Console.Error;
+            }
 
-        private static RTMP_LogCallback cb = rtmp_log_default;
+            if (level <= RTMP_debuglevel)
+            {
+                if (needNewLine)
+                {
+                    fmsg.WriteLine();
+                    needNewLine = false;
+                }
 
-        private static RTMP_LogLevel RTMP_debuglevel = RTMP_LogLevel.RTMP_LOGERROR;
+                fmsg.WriteLine("{0}: {1}", loglevel_to_string(level), msg);
+            }
+        }
 
+        /// <summary>void RTMP_LogSetOutput(FILE *file) </summary>
+        public static void RTMP_LogSetOutput(TextWriter w)
+        {
+            fmsg = w;
+        }
+
+        /// <summary> void RTMP_LogSetLevel(RTMP_LogLevel level) </summary>
+        public static void RTMP_LogSetLevel(RTMP_LogLevel level)
+        {
+            RTMP_debuglevel = level;
+        }
+
+        /// <summary> RTMP_LogLevel RTMP_LogGetLevel() </summary>
+        public static RTMP_LogLevel RTMP_LogGetLevel()
+        {
+            return RTMP_debuglevel;
+        }
+
+        /// <summary> void RTMP_LogSetCallback(RTMP_LogCallback *cbp) </summary>
         public static void RTMP_LogSetCallback(RTMP_LogCallback callback)
         {
             cb = callback;
         }
 
-        private static TextWriter tw;
-
-        public static void RTMP_LogSetOutput(TextWriter w)
-        {
-            tw = w;
-        }
-
-        private const int MAX_PRINT_LEN = 2048;
-        private static bool needNewLine;
-
-        public static void RTMP_LogPrintf(string fmt, params object[] vals)
-        {
-            if (RTMP_debuglevel == RTMP_LogLevel.RTMP_LOGCRIT)
-            {
-                return;
-            }
-
-            if (tw == null)
-            {
-                tw = Console.Error;
-            }
-
-            if (needNewLine)
-            {
-                tw.WriteLine();
-                needNewLine = false;
-            }
-
-            var msg = string.Format(fmt, vals);
-            if (msg.Length > MAX_PRINT_LEN - 1)
-            {
-                msg = msg.Substring(MAX_PRINT_LEN - 1);
-            }
-
-            tw.Write(msg);
-            if (msg.EndsWith("\n"))
-            {
-                tw.Flush();
-            }
-        }
-
-        public static void RTMP_LogStatus(string fmt, params object[] vals)
-        {
-            if (RTMP_debuglevel == RTMP_LogLevel.RTMP_LOGCRIT)
-            {
-                return;
-            }
-
-            if (tw == null)
-            {
-                tw = Console.Error;
-            }
-
-            tw.Write(fmt, vals);
-            needNewLine = true;
-        }
-
+        /// <summary> void RTMP_Log(int level, const char *format, ...) </summary>
         public static void RTMP_Log(RTMP_LogLevel level, string fmt, params object[] vals)
         {
             cb(level, fmt, vals);
         }
 
+        /// <summary> void RTMP_LogHex(int level, const uint8_t *data, unsigned long len) </summary>
         public static void RTMP_LogHex(RTMP_LogLevel level, byte[] data, ulong len)
         {
             if (level > RTMP_debuglevel)
@@ -182,6 +173,7 @@ namespace librtmp
             }
         }
 
+        /// <summary> void RTMP_LogHexString(int level, const uint8_t *data, unsigned long len) </summary>
         public static void RTMP_LogHexString(RTMP_LogLevel level, byte[] data, ulong len)
         {
             if (data.Length == 0 || level > RTMP_debuglevel)
@@ -247,39 +239,53 @@ namespace librtmp
             }
         }
 
-        public static void RTMP_LogSetLevel(RTMP_LogLevel level)
+        /// <summary> void RTMP_LogPrintf(const char *format, ...) </summary>
+        public static void RTMP_LogPrintf(string fmt, params object[] vals)
         {
-            RTMP_debuglevel = level;
-        }
-
-        public static RTMP_LogLevel RTMP_LogGetLevel()
-        {
-            return RTMP_debuglevel;
-        }
-
-        private static void rtmp_log_default(RTMP_LogLevel level, string fmt, params object[] vals)
-        {
-            var msg = string.Format(fmt, vals);
-            if (RTMP_debuglevel < RTMP_LogLevel.RTMP_LOGALL && msg.Contains("no-name"))
+            if (RTMP_debuglevel == RTMP_LogLevel.RTMP_LOGCRIT)
             {
                 return;
             }
 
-            if (tw == null)
+            if (fmsg == null)
             {
-                tw = Console.Error;
+                fmsg = Console.Error;
             }
 
-            if (level <= RTMP_debuglevel)
+            if (needNewLine)
             {
-                if (needNewLine)
-                {
-                    tw.WriteLine();
-                    needNewLine = false;
-                }
-
-                tw.WriteLine("{0}: {1}", loglevel_to_string(level), msg);
+                fmsg.WriteLine();
+                needNewLine = false;
             }
+
+            var msg = string.Format(fmt, vals);
+            if (msg.Length > MAX_PRINT_LEN - 1)
+            {
+                msg = msg.Substring(MAX_PRINT_LEN - 1);
+            }
+
+            fmsg.Write(msg);
+            if (msg.EndsWith("\n"))
+            {
+                fmsg.Flush();
+            }
+        }
+
+        /// <summary> void RTMP_LogStatus(const char *format, ...) </summary>
+        public static void RTMP_LogStatus(string fmt, params object[] vals)
+        {
+            if (RTMP_debuglevel == RTMP_LogLevel.RTMP_LOGCRIT)
+            {
+                return;
+            }
+
+            if (fmsg == null)
+            {
+                fmsg = Console.Error;
+            }
+
+            fmsg.Write(fmt, vals);
+            needNewLine = true;
         }
     }
 }

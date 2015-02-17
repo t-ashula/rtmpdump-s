@@ -31,8 +31,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 using System.Security;
 using System.Threading;
 using librtmp;
@@ -1246,7 +1244,10 @@ namespace rtmpsuck
 
         #endregion
 
+        #region netstackdump
+
         // TODO: C#-style resource handling
+        // TODO: change architecture. add debug dump file setter api in librtmp
 
         private BinaryWriter _netStackDump;
 
@@ -1272,6 +1273,8 @@ namespace rtmpsuck
                 _netStackDumpRead.Close();
             }
         }
+
+        #endregion
 
         [Conditional("DEBUG")]
         private void serverPacket_Dump(RTMPPacket packet)

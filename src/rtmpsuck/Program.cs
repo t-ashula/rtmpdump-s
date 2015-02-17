@@ -768,14 +768,16 @@ namespace rtmpsuck
         private void doServe(STREAMING_SERVER server)
         {
             var __FUNCTION__ = "doServe";
-            uint buflen = 131072;
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, start,\n", __FUNCTION__);
+            uint buflen = 131072; // = 128 * 1024
             bool paused = false;
             var sock = server.socket;
 
             server.state = STREAMING_STATUS.STREAMING_IN_PROGRESS;
-            if (sock.Poll(5000, SelectMode.SelectRead))
+            if (!sock.Poll(5000, SelectMode.SelectRead))
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request");
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request. 1");
 
                 goto quit;
             }
@@ -850,7 +852,7 @@ namespace rtmpsuck
                                 continue;
                             }
                         }
-                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request");
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Request timeout/select failed, ignoring request.2");
 
                         goto cleanup;
                     }
@@ -1032,6 +1034,24 @@ namespace rtmpsuck
             }
 
         cleanup:
+            Log.RTMP_LogPrintf("Closing connection... ");
+            RTMP.RTMP_Close(server.rs);
+            RTMP.RTMP_Close(server.rc);
+            foreach (var fl in server.f_head)
+            {
+                // TODO: fclose(fl.f_file);
+            }
+
+            server.f_cur = 0;
+            /* Should probably be done by RTMP_Close() ... */
+            // server.rc.Link.hostname.av_val = null;
+            // server.rc.Link.tcUrl.av_val = null;
+            // server.rc.Link.swfUrl.av_val = null;
+            // server.rc.Link.pageUrl.av_val = null;
+            // server.rc.Link.app.av_val = null;
+            // server.rc.Link.auth.av_val = null;
+            // server.rc.Link.flashVer.av_val = null;
+            Log.RTMP_LogPrintf("done!\n\n");
 
         quit:
 
@@ -1039,8 +1059,6 @@ namespace rtmpsuck
             {
                 server.state = STREAMING_STATUS.STREAMING_ACCEPTING;
             }
-
-            return;
         }
 
         /// <summary>
@@ -1050,6 +1068,7 @@ namespace rtmpsuck
         private void serverThread(STREAMING_SERVER server)
         {
             var __FUNCTION__ = "serverThread";
+
             server.state = STREAMING_STATUS.STREAMING_ACCEPTING;
             while (server.state == STREAMING_STATUS.STREAMING_ACCEPTING)
             {
@@ -1079,6 +1098,7 @@ namespace rtmpsuck
         private STREAMING_SERVER startStreaming(string address, int port)
         {
             var __FUNCTION__ = "startStreaming";
+
             Socket socket;
             try
             {
@@ -1086,10 +1106,11 @@ namespace rtmpsuck
             }
             catch (SocketException)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, couldn't create socket", "startStreamingServer");
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, couldn't create socket", __FUNCTION__);
                 return null;
             }
 
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, socket created,\n", __FUNCTION__);
             socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             try
             {
@@ -1130,7 +1151,14 @@ namespace rtmpsuck
                 }
             }
 
-            var server = new STREAMING_SERVER { socket = socket };
+            var server = new STREAMING_SERVER
+            {
+                socket = socket,
+                state = STREAMING_STATUS.STREAMING_ACCEPTING,
+                stamp = 0,
+                f_cur = 0,
+            };
+
             ThreadCreate(serverThread, server);
             return server;
         }
@@ -1256,8 +1284,8 @@ namespace rtmpsuck
         [Conditional("DEBUG")]
         private void open_dump_file()
         {
-            _netStackDump = new BinaryWriter(new FileStream("netstackdump", FileMode.CreateNew, FileAccess.Write));
-            _netStackDumpRead = new BinaryWriter(new FileStream("netstackdump_read", FileMode.CreateNew, FileAccess.Write));
+            _netStackDump = new BinaryWriter(new FileStream("netstackdump", FileMode.Create, FileAccess.Write));
+            _netStackDumpRead = new BinaryWriter(new FileStream("netstackdump_read", FileMode.Create, FileAccess.Write));
         }
 
         [Conditional("DEBUG")]

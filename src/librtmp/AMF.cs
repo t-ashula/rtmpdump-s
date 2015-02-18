@@ -25,6 +25,7 @@
 
 using System;
 using System.Linq;
+using System.Security.Policy;
 
 namespace librtmp
 {
@@ -146,6 +147,24 @@ namespace librtmp
                 av_len = str.Length,
                 av_val = str.ToCharArray().Select(c => (byte)c).ToArray()
             };
+        }
+
+        /// <summary> toString </summary>
+        /// <param name="len"></param>
+        /// <returns></returns>
+        public string to_s(int len = 0)
+        {
+            if (len == 0 || len > av_len)
+            {
+                len = av_len;
+            }
+
+            if (len > av_val.Length)
+            {
+                len = av_val.Length;
+            }
+
+            return new string(av_val.Select(b => (char)b).Take(len).ToArray());
         }
     }
 

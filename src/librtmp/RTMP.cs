@@ -47,6 +47,26 @@ namespace librtmp
         public const int RTMP_PROTOCOL_RTMPTS = (RTMP_FEATURE_HTTP | RTMP_FEATURE_SSL);
         public const int RTMP_PROTOCOL_RTMFP = RTMP_FEATURE_MFP;
 
+        public const int RTMP_DEFAULT_CHUNKSIZE = 128;
+
+        public const int RTMP_BUFFER_CACHE_SIZE = 16 * 2048;
+
+        public const int RTMP_CHANNELS = 65600;
+
+        public static readonly string[] RTMPProtocolStrings =
+        {
+            "RTMP", "RTMPT", "RTMPE", "RTMPTE", "RTMPS", "RTMPTS", "", "", "RTMFP"
+        };
+
+        public static readonly string[] RTMPProtocolStringsLower =
+        {
+            "rtmp", "rtmpt", "rtmpe", "rtmpte", "rtmps", "rtmpts", "", "", "rtmfp"
+        };
+
+        /// <summary> const AVal RTMP_DefaultFlashVer </summary>
+        /// <remarks>TODO: OSS( WIN/SOL/MAC/LNX/GNU) </remarks>
+        public static readonly AVal RTMP_DefaultFlashVer = AVal.AVC("WIN 10,0,32,18");
+
         public static bool RTMP_ctrlC { get; set; } // rtmp.c global, not struct RTMP member
 
         /// <summary> int m_inChunkSize; </summary>
@@ -164,23 +184,47 @@ namespace librtmp
         public RTMP_LNK Link { get; set; }
 
         // int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port, AVal *playpath, AVal *app);
+        public static bool RTMP_ParseURL(string url, out int protocol, out AVal host, out int port, out AVal playpath, out AVal app)
+        {
+            throw new NotImplementedException();
+        }
 
         // void RTMP_ParsePlaypath(AVal *in, AVal *out);
 
-        // void RTMP_SetBufferMS(RTMP *r, int size);
+        /// <summary> void RTMP_SetBufferMS(RTMP *r, int size);</summary>
+        public static void RTMP_SetBufferMS(RTMP r, int size)
+        {
+            throw new NotImplementedException();
+        }
 
         // void RTMP_UpdateBufferMS(RTMP *r);
 
         // int RTMP_SetOpt(RTMP *r, const AVal *opt, AVal *arg);
+        public static bool RTMP_SetOpt(RTMP r, AVal opt, AVal arg)
+        {
+            throw new NotImplementedException();
+        }
 
-        // int RTMP_SetupURL(RTMP *r, char *url);
+        /// <summary> int RTMP_SetupURL(RTMP *r, char *url); </summary>
+        public static bool RTMP_SetupURL(RTMP r, string url)
+        {
+            throw new NotImplementedException();
+        }
 
-        /*
-        void RTMP_SetupStream(RTMP *r, int protocol,AVal *hostname,unsigned int port,
-            AVal *sockshost,AVal *playpath,AVal *tcUrl,AVal *swfUrl,AVal *pageUrl,
-            AVal *app,AVal *auth,AVal *swfSHA256Hash,uint32_t swfSize,AVal *flashVer,
-        AVal *subscribepath,AVal *usherToken,int dStart,int dStop, int bLiveStream, long int timeout);
-         */
+        /// <summary>
+        /// void RTMP_SetupStream(RTMP *r, int protocol,AVal *hostname,unsigned int port,
+        /// AVal *sockshost,AVal *playpath,AVal *tcUrl,AVal *swfUrl,AVal *pageUrl,
+        /// AVal *app,AVal *auth,AVal *swfSHA256Hash,uint32_t swfSize,AVal *flashVer,
+        /// AVal *subscribepath,AVal *usherToken,int dStart,int dStop, int bLiveStream, long int timeout);
+        /// </summary>
+        public static void RTMP_SetupStream(RTMP r,
+            int protocol, AVal hostname, int port, AVal sockshost,
+            AVal playpath, AVal tcUrl, AVal swfUrl, AVal pageUrl, AVal app,
+            AVal auth, AVal swfSha256Hash, int swfSize, AVal flashVer,
+            AVal subscribepath, AVal usherToken, int dStart, int dStop, bool bLiveStream, int timeout)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary> int RTMP_Connect(RTMP *r, RTMPPacket *cp); </summary>
         public static bool RTMP_Connect(RTMP r, RTMPPacket cp)
@@ -223,16 +267,33 @@ namespace librtmp
         }
 
         // int RTMP_Socket(RTMP *r);
-        // int RTMP_IsTimedout(RTMP *r);
+
+        /// <summary> int RTMP_IsTimedout(RTMP *r);</summary>
+        public static bool RTMP_IsTimedout(RTMP r)
+        {
+            throw new NotImplementedException();
+        }
+
         // double RTMP_GetDuration(RTMP *r);
-        // int RTMP_ToggleStream(RTMP *r);
+
+        /// <summary> int RTMP_ToggleStream(RTMP* r); </summary>
         public static bool RTMP_ToggleStream(RTMP r)
         {
             throw new NotImplementedException();
         }
 
-        // int RTMP_ConnectStream(RTMP *r, int seekTime);
-        // int RTMP_ReconnectStream(RTMP *r, int seekTime);
+        /// <summary> int RTMP_ConnectStream(RTMP* r, int seekTime); </summary>
+        public static bool RTMP_ConnectStream(RTMP r, int seekTime)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> int RTMP_ReconnectStream(RTMP *r, int seekTime); </summary>
+        public static bool RTMP_ReconnectStream(RTMP r, int seekTime)
+        {
+            throw new NotImplementedException();
+        }
+
         // void RTMP_DeleteStream(RTMP *r);
         // int RTMP_GetNextMediaPacket(RTMP *r, RTMPPacket *packet);
         /// <summary> int RTMP_ClientPacket(RTMP *r, RTMPPacket *packet);</summary>
@@ -241,10 +302,31 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
+#if CRYPTO
+        private class TLS_CTX { }
+
+        private static TLS_CTX RTMP_TLS_ctx;
+#endif
+
         /// <summary> void RTMP_Init(RTMP *r); </summary>
         public static void RTMP_Init(RTMP r)
         {
-            throw new NotImplementedException();
+#if CRYPTO
+            if (RTMP_TLS_ctx == null)
+            {
+                RTMP_TLS_Init();
+            }
+#endif
+            r.m_sb = new RTMPSockBuf { sb_socket = null };
+            r.m_inChunkSize = RTMP_DEFAULT_CHUNKSIZE;
+            r.m_outChunkSize = RTMP_DEFAULT_CHUNKSIZE;
+            r.m_nBufferMS = 30000;
+            r.m_nClientBW = 2500000;
+            r.m_nClientBW2 = 2;
+            r.m_nServerBW = 2500000;
+            r.m_fAudioCodecs = 3191.0;
+            r.m_fVideoCodecs = 252.0;
+            r.Link = new RTMP_LNK { timeout = 30, swfAge = 30 };
         }
 
         /// <summary> void RTMP_Close(RTMP *r); </summary>
@@ -293,6 +375,12 @@ namespace librtmp
         public static int RTMP_HashSWF(byte[] url, ref int size, byte[] hash, int age)
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary> void RTMP_TLS_Init() </summary>
+        private static void RTMP_TLS_Init()
+        {
+            //
         }
     }
 

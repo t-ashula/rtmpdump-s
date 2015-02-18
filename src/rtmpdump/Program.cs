@@ -998,8 +998,189 @@ namespace rtmpdump
         /// <returns></returns>
         private RD_STATUS GetLastKeyframe(FileStream file, int nSkipKeyFrames,
             out int dSeek, out byte[] initialFrame, out int initialFrameType, out uint nInitialFrameSize)
+        // length of initialFrame [out]
         {
-            throw new NotImplementedException();
+            const int bufferSize = 16;
+            byte[] buffer = new byte[bufferSize];
+            byte dataType;
+            bool bAudioOnly; // int bAudioOnly;
+            var size = file.Length;
+
+            dSeek = 0;
+            nInitialFrameSize = 0;
+            initialFrameType = 0;
+            initialFrame = new byte[0];
+
+            // fseek(file, 0, SEEK_END);size = ftello(file);
+            // fseek(file, 4, SEEK_SET);
+            // if (fread(&dataType, sizeof(uint8_t), 1, file) != 1)
+            try
+            {
+                var buf = new byte[1];
+                file.Read(buf, 4, 1);
+                dataType = buf[0];
+            }
+            catch
+            {
+                return RD_STATUS.RD_FAILED;
+            }
+
+            bAudioOnly = ((dataType & 0x4) != 0) && ((dataType & 0x1) == 0);
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "bAudioOnly: {0}, size: {1}", bAudioOnly, size);
+
+            // ok, we have to get the timestamp of the last keyframe (only keyframes are seekable) / last audio frame (audio only streams)
+
+            //if(!bAudioOnly) // we have to handle video/video+audio different since we have non-seekable frames
+            //{
+            // find the last seekable frame
+            var tsize = 0; // off_t tsize = 0;
+            int prevTagSize = 0; // uint32_t prevTagSize = 0;
+
+            // go through the file and find the last video keyframe
+            do
+            {
+            skipkeyframe:
+                if (size - tsize < 13)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Unexpected start of file, error in tag sizes, couldn't arrive at prevTagSize=0");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                // fseeko(file, size - tsize - 4, SEEK_SET);
+                try
+                {
+                    // xread = fread(buffer, 1, 4, file);
+                    file.Read(buffer, (int)(size - tsize - 4), 4);
+                }
+                catch
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't read prevTagSize from file!");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                prevTagSize = (int)AMF.AMF_DecodeInt32(buffer);
+                //Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Last packet: prevTagSize: %d", prevTagSize);
+
+                if (prevTagSize == 0)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't find keyframe to resume from!");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                if (prevTagSize < 0 || prevTagSize > size - 4 - 13)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Last tag size must be greater/equal zero (prevTagSize={0}) and smaller then filesize, corrupt file!", prevTagSize);
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                tsize += prevTagSize + 4;
+
+                // read header
+                // fseeko(file, size - tsize, SEEK_SET);
+                // if (fread(buffer, 1, 12, file) != 12)
+                try
+                {
+                    file.Read(buffer, (int)(size - tsize), 12);
+                }
+                catch
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't read header!");
+                    return RD_STATUS.RD_FAILED;
+                }
+                //*
+#if _DEBUG
+                uint32_t ts = AMF.AMF_DecodeInt24(buffer + 4);
+                ts |= (buffer[7] << 24);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%02X: TS: %d ms", buffer[0], ts);
+#endif //*/
+
+                // this just continues the loop whenever the number of skipped frames is > 0,
+                // so we look for the next keyframe to continue with
+                //
+                // this helps if resuming from the last keyframe fails and one doesn't want to start
+                // the download from the beginning
+                //
+                if (nSkipKeyFrames > 0 && !(!bAudioOnly && (buffer[0] != 0x09 || (buffer[11] & 0xf0) != 0x10)))
+                {
+#if _DEBUG
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "xxxxxxxxxxxxxxxxxxxxxxxx Well, lets go one more back!");
+#endif
+                    nSkipKeyFrames--;
+                    goto skipkeyframe;
+                }
+            }
+            while ((bAudioOnly && buffer[0] != 0x08)
+                || (!bAudioOnly
+                    && (buffer[0] != 0x09 || (buffer[11] & 0xf0) != 0x10))); // as long as we don't have a keyframe / last audio frame
+
+            // save keyframe to compare/find position in stream
+            initialFrameType = buffer[0];
+            nInitialFrameSize = (uint)(prevTagSize - 11);
+            initialFrame = new byte[nInitialFrameSize];// (char*)malloc(*nInitialFrameSize);
+
+            // fseeko(file, size - tsize + 11, SEEK_SET);
+            // if (fread(*initialFrame, 1, *nInitialFrameSize, file) != *nInitialFrameSize)
+            try
+            {
+                file.Read(initialFrame, (int)(size - tsize + 11), (int)nInitialFrameSize);
+            }
+            catch
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't read last keyframe, aborting!");
+                return RD_STATUS.RD_FAILED;
+            }
+
+            dSeek = AMF.AMF_DecodeInt24(buffer.Skip(4).ToArray()); // set seek position to keyframe tmestamp
+            dSeek |= (buffer[7] << 24);
+            //}
+            //else // handle audio only, we can seek anywhere we'd like
+            //{
+            //}
+
+            if (dSeek < 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR,
+                    "Last keyframe timestamp is negative, aborting, your file is corrupt!");
+                return RD_STATUS.RD_FAILED;
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Last keyframe found at: %d ms, size: %d, type: %02X", dSeek, nInitialFrameSize, initialFrameType);
+
+            /*
+     // now read the timestamp of the frame before the seekable keyframe:
+     fseeko(file, size-tsize-4, SEEK_SET);
+     if(fread(buffer, 1, 4, file) != 4) {
+     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't read prevTagSize from file!");
+     goto start;
+     }
+     uint32_t prevTagSize = RTMP_LIB::AMF_DecodeInt32(buffer);
+     fseeko(file, size-tsize-4-prevTagSize+4, SEEK_SET);
+     if(fread(buffer, 1, 4, file) != 4) {
+     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't read previous timestamp!");
+     goto start;
+     }
+     uint32_t timestamp = RTMP_LIB::AMF_DecodeInt24(buffer);
+     timestamp |= (buffer[3]<<24);
+
+     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Previous timestamp: %d ms", timestamp);
+   */
+
+            if (dSeek != 0)
+            {
+                // seek to position after keyframe in our file (we will ignore the keyframes resent by the server
+                // since they are sent a couple of times and handling this would be a mess)
+                // fseeko(file, size - tsize + prevTagSize + 4, SEEK_SET);
+                file.Position = (size - tsize + prevTagSize + 4);
+
+                // make sure the WriteStream doesn't write headers and ignores all the 0ms TS packets
+                // (including several meta data headers and the keyframe we seeked to)
+                //bNoHeader = TRUE; if bResume==true this is true anyway
+            }
+
+            //}
+
+            return RD_STATUS.RD_SUCCESS;
         }
 
         //

@@ -26,7 +26,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using librtmp;
 
 namespace rtmpdump
@@ -173,6 +172,7 @@ namespace rtmpdump
                 if (arg == "-h" || arg == "--help")
                 {
                     usage();
+                    return RD_STATUS.RD_SUCCESS;
                 }
 
 #if CRYPTO

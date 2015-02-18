@@ -596,7 +596,7 @@ namespace rtmpdump
             // ok, we have to get the timestamp of the last keyframe (only keyframes are seekable) / last audio frame (audio only streams)
             if (bResume)
             {
-                nStatus = OpenResumeFile(flvFile, out file, out size, out metaHeader, ref nMetaHeaderSize, ref duration);
+                nStatus = OpenResumeFile(flvFile, out file, out size, out metaHeader, out nMetaHeaderSize, ref duration);
                 if (nStatus == RD_STATUS.RD_FAILED)
                 {
                     goto clean;
@@ -710,6 +710,7 @@ namespace rtmpdump
                         {
                             nStatus = RD_STATUS.RD_INCOMPLETE;
                         }
+
                         break;
                     }
 
@@ -815,10 +816,173 @@ namespace rtmpdump
             out FileStream file,
             out uint size,
             out byte[] metaHeader,
-            ref uint nMetaHeaderSize,
+            out uint nMetaHeaderSize,
             ref double duration)
         {
-            throw new NotImplementedException();
+            var __FUNCTION__ = "OpenResumeFile";
+            var bufferSize = 0; // size_t bufferSize = 0;
+            var hbuf = new byte[16]; // char hbuf [16], *buffer = NULL;
+            var buffer = new byte[0];
+
+            metaHeader = new byte[0];
+            nMetaHeaderSize = 0;
+            size = 0;
+
+            // *file = fopen(flvFile, "r+b");
+            try
+            {
+                file = new FileStream(flvFile, FileMode.Open, FileAccess.Read);
+            }
+            catch
+            {
+                file = null;
+                // RD_SUCCESS, because we go to fresh file mode instead of quiting
+                return RD_STATUS.RD_SUCCESS;
+            }
+
+            size = (uint)file.Length; // TODO: uint->long
+
+            if (size > 0)
+            {
+                // verify FLV format and read header
+                uint prevTagSize = 0;
+
+                // check we've got a valid FLV file to continue!
+                // if (fread(hbuf, 1, 13, *file) != 13)
+                try
+                {
+                    file.Read(hbuf, 0, 13);
+                }
+                catch
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't read FLV file header!");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                if (hbuf[0] != 'F' || hbuf[1] != 'L' || hbuf[2] != 'V' || hbuf[3] != 0x01)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Invalid FLV file!");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                if ((hbuf[4] & 0x05) == 0)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "FLV file contains neither video nor audio, aborting!");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                uint dataOffset = AMF.AMF_DecodeInt32(hbuf.Skip(5).ToArray());
+                // fseek(*file, dataOffset, SEEK_SET);
+                // if (fread(hbuf, 1, 4, *file) != 4)
+                try
+                {
+                    file.Read(hbuf, (int)dataOffset, 4);
+                }
+                catch
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Invalid FLV file: missing first prevTagSize!");
+                    return RD_STATUS.RD_FAILED;
+                }
+
+                prevTagSize = AMF.AMF_DecodeInt32(hbuf);
+                if (prevTagSize != 0)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
+                        "First prevTagSize is not zero: prevTagSize = 0x{0:08X}",
+                        prevTagSize);
+                }
+
+                // go through the file to find the meta data!
+                var pos = dataOffset + 4;// off_t pos = dataOffset + 4;
+                var bFoundMetaHeader = false; // int bFoundMetaHeader = FALSE;
+
+                while (pos < size - 4 && !bFoundMetaHeader)
+                {
+                    // fseeko(*file, pos, SEEK_SET);
+                    // if (fread(hbuf, 1, 4, *file) != 4)
+                    try
+                    {
+                        file.Read(hbuf, (int)pos, 4);
+                    }
+                    catch
+                    {
+                        break;
+                    }
+
+                    // uint32_t dataSize = AMF_DecodeInt24(hbuf + 1);
+                    var dataSize = AMF.AMF_DecodeInt24(hbuf.Skip(1).ToArray());
+
+                    if (hbuf[0] == 0x12)
+                    {
+                        if (dataSize > bufferSize)
+                        {
+                            /* round up to next page boundary */
+                            bufferSize = dataSize + 4095;
+                            bufferSize ^= (bufferSize & 4095);
+                            // free(buffer);
+                            // buffer = malloc(bufferSize);
+                            // if (!buffer) return RD_STATUS.RD_FAILED;
+                            buffer = new byte[bufferSize];
+                        }
+
+                        // fseeko(*file, pos + 11, SEEK_SET);
+                        // if (fread(buffer, 1, dataSize, *file) != dataSize)
+                        try
+                        {
+                            file.Read(buffer, (int)(pos + 11), dataSize);
+                        }
+                        catch
+                        {
+                            break;
+                        }
+
+                        AMFObject metaObj = new AMFObject();
+                        int nRes = AMFObject.AMF_Decode(metaObj, buffer, dataSize, false);
+                        if (nRes < 0)
+                        {
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding meta data packet", __FUNCTION__);
+                            break;
+                        }
+
+                        AVal metastring;
+                        AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(metaObj, null, 0), out metastring);
+
+                        if (AVal.Match(metastring, av_onMetaData))
+                        {
+                            AMFObject.AMF_Dump(metaObj);
+
+                            nMetaHeaderSize = (uint)dataSize;
+                            // if (*metaHeader) free(*metaHeader);
+                            // *metaHeader = (char*)malloc(*nMetaHeaderSize);
+                            // memcpy(*metaHeader, buffer, *nMetaHeaderSize);
+                            metaHeader = buffer.Take(dataSize).ToArray();
+
+                            // get duration
+                            AMFObjectProperty prop;
+                            if (RTMP.RTMP_FindFirstMatchingProperty(metaObj, av_duration, out prop))
+                            {
+                                duration = AMFObjectProperty.AMFProp_GetNumber(prop);
+                                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "File has duration: {0}", duration);
+                            }
+
+                            bFoundMetaHeader = true;
+                            break;
+                        }
+                        //metaObj.Reset();
+                        //delete obj;
+                    }
+
+                    pos += (uint)(dataSize + 11 + 4); // TODO: uint
+                }
+
+                // free(buffer);
+                if (!bFoundMetaHeader)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "Couldn't locate meta data!");
+                }
+            }
+
+            return RD_STATUS.RD_SUCCESS;
         }
 
         /// <summary>
@@ -876,7 +1040,7 @@ namespace rtmpdump
         private FileStream file;
 
         /// <summary> #define HEX2BIN(a)      (((a)&0x40)?((a)&0xf)+9:((a)&0xf)) </summary>
-        private byte Hex2Bin(char a)
+        private static byte Hex2Bin(char a)
         {
             return ((a & 0x40) != 0x00) ? (byte)((a & 0x0f) + 9) : (byte)(a & 0x0f);
         }
@@ -884,7 +1048,7 @@ namespace rtmpdump
         /// <summary> int hex2bin(char *str, char **hex) </summary>
         /// <param name="str">hex string</param>
         /// <returns>byte array</returns>
-        private byte[] Hex2Bin(string str)
+        private static byte[] Hex2Bin(string str)
         {
             var l = str.Length;
             if (l % 2 == 1)
@@ -910,7 +1074,7 @@ namespace rtmpdump
         private static readonly AVal av_true = AVal.AVC("true");
 
         /// <summary> #define STR2AVAL(av,str)	av.av_val = str; av.av_len = strlen(av.av_val) </summary>
-        private AVal Str2Aval(string str)
+        private static AVal Str2Aval(string str)
         {
             return AVal.AVC(str);
         }

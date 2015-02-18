@@ -355,7 +355,11 @@ namespace librtmp
         // int RTMP_SendPause(RTMP *r, int DoPause, int dTime);
         // int RTMP_Pause(RTMP *r, int DoPause);
 
-        // int RTMP_FindFirstMatchingProperty(AMFObject *obj, const AVal *name,AMFObjectProperty * p);
+        /// <summary> int RTMP_FindFirstMatchingProperty(AMFObject *obj, const AVal *name,AMFObjectProperty * p); </summary>
+        public static bool RTMP_FindFirstMatchingProperty(AMFObject obj, AVal name, out AMFObjectProperty p)
+        {
+            throw new NotImplementedException();
+        }
 
         // int RTMPSockBuf_Fill(RTMPSockBuf *sb);
         // int RTMPSockBuf_Send(RTMPSockBuf *sb, const char *buf, int len);

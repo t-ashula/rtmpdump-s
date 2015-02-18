@@ -108,7 +108,6 @@ namespace rtmpdump
             int timeout = DEF_TIMEOUT; // timeout connection after 120 seconds
             int dStartOffset = 0; // uint32_t dStartOffset = 0; // seek position in non-live mode
             int dStopOffset = 0; // uint32_t dStopOffset = 0;
-            RTMP rtmp = new RTMP();
 
             AVal fullUrl = new AVal();
             AVal swfUrl = new AVal();
@@ -163,7 +162,7 @@ namespace rtmpdump
                 return RD_STATUS.RD_FAILED;
             }
 
-            rtmp = new RTMP();
+            var rtmp = new RTMP();
             RTMP.RTMP_Init(rtmp);
 
             for (var i = 0; i < argc; ++i)
@@ -592,11 +591,11 @@ namespace rtmpdump
             }
 
             // off_t size = 0;
-            uint size = 0;
 
             // ok, we have to get the timestamp of the last keyframe (only keyframes are seekable) / last audio frame (audio only streams)
             if (bResume)
             {
+                uint size;
                 nStatus = OpenResumeFile(flvFile, out file, out size, out metaHeader, out nMetaHeaderSize, ref duration);
                 if (nStatus == RD_STATUS.RD_FAILED)
                 {
@@ -703,15 +702,7 @@ namespace rtmpdump
                     if (retries != 0)
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Failed to resume the stream\n\n");
-                        if (!RTMP.RTMP_IsTimedout(rtmp))
-                        {
-                            nStatus = RD_STATUS.RD_FAILED;
-                        }
-                        else
-                        {
-                            nStatus = RD_STATUS.RD_INCOMPLETE;
-                        }
-
+                        nStatus = RTMP.RTMP_IsTimedout(rtmp) ? RD_STATUS.RD_INCOMPLETE : RD_STATUS.RD_FAILED;
                         break;
                     }
 
@@ -735,30 +726,14 @@ namespace rtmpdump
                         if (!RTMP.RTMP_ReconnectStream(rtmp, dSeek))
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Failed to resume the stream\n\n");
-                            if (!RTMP.RTMP_IsTimedout(rtmp))
-                            {
-                                nStatus = RD_STATUS.RD_FAILED;
-                            }
-                            else
-                            {
-                                nStatus = RD_STATUS.RD_INCOMPLETE;
-                            }
-
+                            nStatus = RTMP.RTMP_IsTimedout(rtmp) ? RD_STATUS.RD_INCOMPLETE : RD_STATUS.RD_FAILED;
                             break;
                         }
                     }
                     else if (!RTMP.RTMP_ToggleStream(rtmp))
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Failed to resume the stream\n\n");
-                        if (!RTMP.RTMP_IsTimedout(rtmp))
-                        {
-                            nStatus = RD_STATUS.RD_FAILED;
-                        }
-                        else
-                        {
-                            nStatus = RD_STATUS.RD_INCOMPLETE;
-                        }
-
+                        nStatus = RTMP.RTMP_IsTimedout(rtmp) ? RD_STATUS.RD_INCOMPLETE : RD_STATUS.RD_FAILED;
                         break;
                     }
 
@@ -787,7 +762,7 @@ namespace rtmpdump
             }
             else if (nStatus == RD_STATUS.RD_INCOMPLETE)
             {
-                Log.RTMP_LogPrintf("Download may be incomplete (downloaded about %.2f%%), try resuming\n", percent);
+                Log.RTMP_LogPrintf("Download may be incomplete (downloaded about {0:f2}%), try resuming\n", percent);
             }
 
         clean:
@@ -1061,7 +1036,7 @@ namespace rtmpdump
                 }
 
                 prevTagSize = (int)AMF.AMF_DecodeInt32(buffer);
-                //Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Last packet: prevTagSize: %d", prevTagSize);
+                //Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Last packet: prevTagSize: {0}", prevTagSize);
 
                 if (prevTagSize == 0)
                 {
@@ -1093,7 +1068,7 @@ namespace rtmpdump
 #if _DEBUG
                 uint32_t ts = AMF.AMF_DecodeInt24(buffer + 4);
                 ts |= (buffer[7] << 24);
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%02X: TS: %d ms", buffer[0], ts);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0:02X}: TS: {1} ms", buffer[0], ts);
 #endif //*/
 
                 // this just continues the loop whenever the number of skipped frames is > 0,
@@ -1141,12 +1116,11 @@ namespace rtmpdump
 
             if (dSeek < 0)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR,
-                    "Last keyframe timestamp is negative, aborting, your file is corrupt!");
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Last keyframe timestamp is negative, aborting, your file is corrupt!");
                 return RD_STATUS.RD_FAILED;
             }
 
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Last keyframe found at: %d ms, size: %d, type: %02X", dSeek, nInitialFrameSize, initialFrameType);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Last keyframe found at: {0} ms, size: {1}, type: {2:02X}", dSeek, nInitialFrameSize, initialFrameType);
 
             /*
      // now read the timestamp of the frame before the seekable keyframe:
@@ -1217,7 +1191,7 @@ namespace rtmpdump
             out double percent)
         // percentage downloaded [out]
         {
-            var __FUNCTION__ = "Download";
+            const string __FUNCTION__ = "Download";
             // int32_t now, lastUpdate;
             int now, lastUpdate;
             int bufferSize = 64 * 1024;
@@ -1234,7 +1208,7 @@ namespace rtmpdump
 
             if (rtmp.m_read.timestamp != 0)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Continuing at TS: %d ms\n", rtmp.m_read.timestamp);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Continuing at TS: {0} ms\n", rtmp.m_read.timestamp);
             }
 
             if (bLiveStream)
@@ -1249,7 +1223,8 @@ namespace rtmpdump
                 {
                     if ((double)rtmp.m_read.timestamp >= (double)duration * 999.0)
                     {
-                        Log.RTMP_LogPrintf("Already Completed at: %.3f sec Duration=%.3f sec\n",
+                        Log.RTMP_LogPrintf(
+                            "Already Completed at: {0:f3} sec Duration={1:f3} sec\n",
                              (double)rtmp.m_read.timestamp / 1000.0,
                              (double)duration / 1000.0);
                         return RD_STATUS.RD_SUCCESS;
@@ -1258,17 +1233,13 @@ namespace rtmpdump
                     {
                         percent = (rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
                         percent = ((double)(int)(percent * 10.0)) / 10.0;
-                        Log.RTMP_LogPrintf("%s download at: %.3f kB / %.3f sec (%.1f%%)\n",
-                             bResume ? "Resuming" : "Starting",
-                             (double)size / 1024.0, (double)rtmp.m_read.timestamp / 1000.0,
-                             percent);
+                        Log.RTMP_LogPrintf("{0} download at: {1:f3} kB / {2:f3} sec ({3:f1}%)\n",
+                             bResume ? "Resuming" : "Starting", (double)size / 1024.0, (double)rtmp.m_read.timestamp / 1000.0, percent);
                     }
                 }
                 else
                 {
-                    Log.RTMP_LogPrintf("%s download at: %.3f kB\n",
-                          bResume ? "Resuming" : "Starting",
-                          (double)size / 1024.0);
+                    Log.RTMP_LogPrintf("{0} download at: {1:f3} kB\n", bResume ? "Resuming" : "Starting", (double)size / 1024.0);
                 }
                 if (bRealtimeStream)
                 {
@@ -1278,7 +1249,7 @@ namespace rtmpdump
 
             if (dStopOffset > 0)
             {
-                Log.RTMP_LogPrintf("For duration: %.3f sec\n", (double)(dStopOffset - dSeek) / 1000.0);
+                Log.RTMP_LogPrintf("For duration: {0:f3} sec\n", (double)(dStopOffset - dSeek) / 1000.0);
             }
 
             if (bResume && nInitialFrameSize > 0)
@@ -1300,7 +1271,7 @@ namespace rtmpdump
             do
             {
                 nRead = RTMP.RTMP_Read(rtmp, buffer, bufferSize);
-                //RTMP_LogPrintf("nRead: %d\n", nRead);
+                //RTMP_LogPrintf("nRead: {0}\n", nRead);
                 if (nRead > 0)
                 {
                     // if (fwrite(buffer, sizeof (unsigned char ), nRead, file) != (size_t)nRead)
@@ -1310,14 +1281,14 @@ namespace rtmpdump
                     }
                     catch
                     {
-                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "%s: Failed writing, exiting!", __FUNCTION__);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}: Failed writing, exiting!", __FUNCTION__);
                         // free(buffer);
                         return RD_STATUS.RD_FAILED;
                     }
 
                     size += nRead;
 
-                    //RTMP_LogPrintf("write %dbytes (%.1f kB)\n", nRead, nRead/1024.0);
+                    // Log.RTMP_LogPrintf("write {0}bytes ({1:f1} kB)\n", nRead, nRead / 1024.0);
                     if (duration <= 0) // if duration unknown try to get it from the stream (onMetaData)
                     {
                         duration = RTMP.RTMP_GetDuration(rtmp);
@@ -1331,8 +1302,7 @@ namespace rtmpdump
                             bufferTime = (uint)(duration * 1000.0) + 5000; // extra 5sec to make sure we've got enough
 
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
-                                "Detected that buffer time is less than duration, resetting to: %dms",
-                                bufferTime);
+                                "Detected that buffer time is less than duration, resetting to: {0}ms", bufferTime);
                             RTMP.RTMP_SetBufferMS(rtmp, (int)bufferTime);
                             RTMP.RTMP_UpdateBufferMS(rtmp);
                         }
@@ -1352,9 +1322,7 @@ namespace rtmpdump
                             now = (int)RTMP.RTMP_GetTime();
                             if (Math.Abs(now - lastUpdate) > 200)
                             {
-                                Log.RTMP_LogStatus("\r%.3f kB / %.2f sec (%.1f%%)",
-                                     (double)size / 1024.0,
-                                     (double)(rtmp.m_read.timestamp) / 1000.0, percent);
+                                Log.RTMP_LogStatus("\r{0:f3} kB / {1:f2} sec ({2:f1}%)", (double)size / 1024.0, (double)(rtmp.m_read.timestamp) / 1000.0, percent);
                                 lastUpdate = now;
                             }
                         }
@@ -1365,10 +1333,14 @@ namespace rtmpdump
                         if (Math.Abs(now - lastUpdate) > 200)
                         {
                             if (bHashes)
+                            {
                                 Log.RTMP_LogStatus("#");
+                            }
                             else
-                                Log.RTMP_LogStatus("\r%.3f kB / %.2f sec", (double)size / 1024.0,
-                                      (double)(rtmp.m_read.timestamp) / 1000.0);
+                            {
+                                Log.RTMP_LogStatus("\r{0:f3} kB / {1:f2} sec", (double)size / 1024.0, (double)(rtmp.m_read.timestamp) / 1000.0);
+                            }
+
                             lastUpdate = now;
                         }
                     }
@@ -1401,30 +1373,30 @@ namespace rtmpdump
                 {
                     percent = ((double)rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
                     percent = ((double)(int)(percent * 10.0)) / 10.0;
-                    Log.RTMP_LogStatus("\r%.3f kB / %.2f sec (%.1f%%)",
-                          (double)size / 1024.0,
-                          (double)(rtmp.m_read.timestamp) / 1000.0, percent);
+                    Log.RTMP_LogStatus("\r{0:f3} kB / {1:f2} sec ({2:f1}%)",
+                          (double)size / 1024.0, (double)(rtmp.m_read.timestamp) / 1000.0, percent);
                 }
                 else
                 {
-                    Log.RTMP_LogStatus("\r%.3f kB / %.2f sec", (double)size / 1024.0,
+                    Log.RTMP_LogStatus("\r{0:f3} kB / {1:f2} sec", (double)size / 1024.0,
                           (double)(rtmp.m_read.timestamp) / 1000.0);
                 }
             }
 
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "RTMP_Read returned: %d", nRead);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "RTMP_Read returned: {0}", nRead);
 
             if (bResume && nRead == -2)
             {
-                Log.RTMP_LogPrintf("Couldn't resume FLV file, try --skip %d\n\n", nSkipKeyFrames + 1);
+                Log.RTMP_LogPrintf("Couldn't resume FLV file, try --skip {0}\n\n", nSkipKeyFrames + 1);
                 return RD_STATUS.RD_FAILED;
             }
 
             if (nRead == -3)
+            {
                 return RD_STATUS.RD_SUCCESS;
+            }
 
-            if ((duration > 0 && percent < 99.9) || RTMP.RTMP_ctrlC || nRead < 0
-                || RTMP.RTMP_IsTimedout(rtmp))
+            if ((duration > 0 && percent < 99.9) || RTMP.RTMP_ctrlC || nRead < 0 || RTMP.RTMP_IsTimedout(rtmp))
             {
                 return RD_STATUS.RD_INCOMPLETE;
             }
@@ -1518,7 +1490,7 @@ namespace rtmpdump
             Log.RTMP_LogPrintf("--token|-T key          Key for SecureToken response\n");
             Log.RTMP_LogPrintf("--jtv|-j JSON           Authentication token for Justin.tv legacy servers\n");
             Log.RTMP_LogPrintf("--hashes|-#             Display progress with hashes, not with the byte counter\n");
-            Log.RTMP_LogPrintf("--buffer|-b             Buffer time in milliseconds (default: %u)\n", DEF_BUFTIME);
+            Log.RTMP_LogPrintf("--buffer|-b             Buffer time in milliseconds (default: {0})\n", DEF_BUFTIME);
             Log.RTMP_LogPrintf("--skip|-k num           Skip num keyframes when looking for last keyframe to resume from. Useful if resume fails (default: {0})\n\n", DEF_SKIPFRM);
             Log.RTMP_LogPrintf("--quiet|-q              Suppresses all command output.\n");
             Log.RTMP_LogPrintf("--verbose|-V            Verbose command output.\n");
@@ -1544,7 +1516,7 @@ namespace rtmpdump
         private void sigIntHandler(object sender, ConsoleCancelEventArgs e)
         {
             RTMP.RTMP_ctrlC = true;
-            var sig = 2; // sigint = 2
+            const int sig = 2; // sigint = 2
             Log.RTMP_LogPrintf("Caught signal: {0}, cleaning up, just a second...\n", sig);
             // ignore all these signals now and let the connection close
             // signal(SIGINT, SIG_IGN);

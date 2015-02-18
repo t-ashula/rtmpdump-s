@@ -88,7 +88,8 @@ namespace rtmpdump
             byte[] initialFrame = new byte[0];
 
             uint nInitialFrameSize = 0;
-            int initialFrameType = 0; // tye: audio or video
+            // int initialFrameType = 0; // tye: audio or video
+            byte initialFrameType = 0;
 
             AVal hostname = new AVal();
             AVal playpath = new AVal();
@@ -997,7 +998,7 @@ namespace rtmpdump
         /// <param name="nInitialFrameSize">length of initialFrame [out]</param>
         /// <returns></returns>
         private RD_STATUS GetLastKeyframe(FileStream file, int nSkipKeyFrames,
-            out int dSeek, out byte[] initialFrame, out int initialFrameType, out uint nInitialFrameSize)
+            out int dSeek, out byte[] initialFrame, out byte initialFrameType, out uint nInitialFrameSize)
         // length of initialFrame [out]
         {
             const int bufferSize = 16;
@@ -1210,12 +1211,225 @@ namespace rtmpdump
         private RD_STATUS Download(
             RTMP rtmp, FileStream file,
             uint dSeek, uint dStopOffset, double duration, bool bResume, byte[] metaHeader, uint nMetaHeaderSize, byte[] initialFrame,
-            int initialFrameType, uint nInitialFrameSize, int nSkipKeyFrames,
+            byte initialFrameType, uint nInitialFrameSize, int nSkipKeyFrames,
             bool bStdoutMode, bool bLiveStream, bool bRealtimeStream,
             bool bHashes, bool bOverrideBufferTime, uint bufferTime,
             out double percent)
+        // percentage downloaded [out]
         {
-            throw new NotImplementedException();
+            var __FUNCTION__ = "Download";
+            // int32_t now, lastUpdate;
+            int now, lastUpdate;
+            int bufferSize = 64 * 1024;
+            // char* buffer;
+            byte[] buffer;
+            int nRead = 0;
+            // off_t size = ftello(file);
+            var size = file.Position; // ftello(file)
+            ulong lastPercent = 0;
+
+            rtmp.m_read.timestamp = dSeek;
+
+            percent = 0.0;
+
+            if (rtmp.m_read.timestamp != 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Continuing at TS: %d ms\n", rtmp.m_read.timestamp);
+            }
+
+            if (bLiveStream)
+            {
+                Log.RTMP_LogPrintf("Starting Live Stream\n");
+            }
+            else
+            {
+                // print initial status
+                // Workaround to exit with 0 if the file is fully (> 99.9%) downloaded
+                if (duration > 0)
+                {
+                    if ((double)rtmp.m_read.timestamp >= (double)duration * 999.0)
+                    {
+                        Log.RTMP_LogPrintf("Already Completed at: %.3f sec Duration=%.3f sec\n",
+                             (double)rtmp.m_read.timestamp / 1000.0,
+                             (double)duration / 1000.0);
+                        return RD_STATUS.RD_SUCCESS;
+                    }
+                    else
+                    {
+                        percent = (rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
+                        percent = ((double)(int)(percent * 10.0)) / 10.0;
+                        Log.RTMP_LogPrintf("%s download at: %.3f kB / %.3f sec (%.1f%%)\n",
+                             bResume ? "Resuming" : "Starting",
+                             (double)size / 1024.0, (double)rtmp.m_read.timestamp / 1000.0,
+                             percent);
+                    }
+                }
+                else
+                {
+                    Log.RTMP_LogPrintf("%s download at: %.3f kB\n",
+                          bResume ? "Resuming" : "Starting",
+                          (double)size / 1024.0);
+                }
+                if (bRealtimeStream)
+                {
+                    Log.RTMP_LogPrintf("  in approximately realtime (disabled BUFX speedup hack)\n");
+                }
+            }
+
+            if (dStopOffset > 0)
+            {
+                Log.RTMP_LogPrintf("For duration: %.3f sec\n", (double)(dStopOffset - dSeek) / 1000.0);
+            }
+
+            if (bResume && nInitialFrameSize > 0)
+            {
+                rtmp.m_read.flags |= RTMP_READ.RTMP_READ_RESUME;
+            }
+
+            rtmp.m_read.initialFrameType = initialFrameType;
+            rtmp.m_read.nResumeTS = dSeek;
+            rtmp.m_read.metaHeader = metaHeader;
+            rtmp.m_read.initialFrame = initialFrame;
+            rtmp.m_read.nMetaHeaderSize = nMetaHeaderSize;
+            rtmp.m_read.nInitialFrameSize = nInitialFrameSize;
+
+            buffer = new byte[bufferSize]; //(char*)malloc(bufferSize);
+
+            now = (int)RTMP.RTMP_GetTime(); // TODO:
+            lastUpdate = now - 1000;
+            do
+            {
+                nRead = RTMP.RTMP_Read(rtmp, buffer, bufferSize);
+                //RTMP_LogPrintf("nRead: %d\n", nRead);
+                if (nRead > 0)
+                {
+                    // if (fwrite(buffer, sizeof (unsigned char ), nRead, file) != (size_t)nRead)
+                    try
+                    {
+                        file.Write(buffer, 0, nRead);
+                    }
+                    catch
+                    {
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "%s: Failed writing, exiting!", __FUNCTION__);
+                        // free(buffer);
+                        return RD_STATUS.RD_FAILED;
+                    }
+
+                    size += nRead;
+
+                    //RTMP_LogPrintf("write %dbytes (%.1f kB)\n", nRead, nRead/1024.0);
+                    if (duration <= 0) // if duration unknown try to get it from the stream (onMetaData)
+                    {
+                        duration = RTMP.RTMP_GetDuration(rtmp);
+                    }
+
+                    if (duration > 0)
+                    {
+                        // make sure we claim to have enough buffer time!
+                        if (!bOverrideBufferTime && bufferTime < (duration * 1000.0))
+                        {
+                            bufferTime = (uint)(duration * 1000.0) + 5000; // extra 5sec to make sure we've got enough
+
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                                "Detected that buffer time is less than duration, resetting to: %dms",
+                                bufferTime);
+                            RTMP.RTMP_SetBufferMS(rtmp, (int)bufferTime);
+                            RTMP.RTMP_UpdateBufferMS(rtmp);
+                        }
+
+                        percent = ((double)rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
+                        percent = ((double)(int)(percent * 10.0)) / 10.0;
+                        if (bHashes)
+                        {
+                            if (lastPercent + 1 <= percent)
+                            {
+                                Log.RTMP_LogStatus("#");
+                                lastPercent = (ulong)percent;
+                            }
+                        }
+                        else
+                        {
+                            now = (int)RTMP.RTMP_GetTime();
+                            if (Math.Abs(now - lastUpdate) > 200)
+                            {
+                                Log.RTMP_LogStatus("\r%.3f kB / %.2f sec (%.1f%%)",
+                                     (double)size / 1024.0,
+                                     (double)(rtmp.m_read.timestamp) / 1000.0, percent);
+                                lastUpdate = now;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        now = (int)RTMP.RTMP_GetTime();
+                        if (Math.Abs(now - lastUpdate) > 200)
+                        {
+                            if (bHashes)
+                                Log.RTMP_LogStatus("#");
+                            else
+                                Log.RTMP_LogStatus("\r%.3f kB / %.2f sec", (double)size / 1024.0,
+                                      (double)(rtmp.m_read.timestamp) / 1000.0);
+                            lastUpdate = now;
+                        }
+                    }
+                }
+                else
+                {
+#if _DEBUG
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "zero read!");
+#endif
+                    if (rtmp.m_read.status == RTMP_READ.RTMP_READ_EOF)
+                    {
+                        break;
+                    }
+                }
+            }
+            while (!RTMP.RTMP_ctrlC && nRead > -1
+                && RTMP.RTMP_IsConnected(rtmp)
+                && !RTMP.RTMP_IsTimedout(rtmp));
+
+            // free(buffer);
+            if (nRead < 0)
+            {
+                nRead = rtmp.m_read.status;
+            }
+
+            /* Final status update */
+            if (!bHashes)
+            {
+                if (duration > 0)
+                {
+                    percent = ((double)rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
+                    percent = ((double)(int)(percent * 10.0)) / 10.0;
+                    Log.RTMP_LogStatus("\r%.3f kB / %.2f sec (%.1f%%)",
+                          (double)size / 1024.0,
+                          (double)(rtmp.m_read.timestamp) / 1000.0, percent);
+                }
+                else
+                {
+                    Log.RTMP_LogStatus("\r%.3f kB / %.2f sec", (double)size / 1024.0,
+                          (double)(rtmp.m_read.timestamp) / 1000.0);
+                }
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "RTMP_Read returned: %d", nRead);
+
+            if (bResume && nRead == -2)
+            {
+                Log.RTMP_LogPrintf("Couldn't resume FLV file, try --skip %d\n\n", nSkipKeyFrames + 1);
+                return RD_STATUS.RD_FAILED;
+            }
+
+            if (nRead == -3)
+                return RD_STATUS.RD_SUCCESS;
+
+            if ((duration > 0 && percent < 99.9) || RTMP.RTMP_ctrlC || nRead < 0
+                || RTMP.RTMP_IsTimedout(rtmp))
+            {
+                return RD_STATUS.RD_INCOMPLETE;
+            }
+
+            return RD_STATUS.RD_SUCCESS;
         }
 
         private FileStream file;

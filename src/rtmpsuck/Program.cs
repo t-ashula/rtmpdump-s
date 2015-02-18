@@ -592,8 +592,7 @@ namespace rtmpsuck
                     break;
                 }
 
-                // ifdef _DEBUG
-                if (false)
+#if _DEBUG
                 {
                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "type: {0:2x}, size: {1}, TS: {2} ms", packet.PacketType, nPacketLen, packet.TimeStamp);
                     if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO)
@@ -601,6 +600,7 @@ namespace rtmpsuck
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "frametype: {0:2x}", (packetBody[0] & 0xf0));
                     }
                 }
+#endif
 
                 // calculate packet size and reallocate buffer if necessary
                 uint size = nPacketLen +
@@ -685,25 +685,23 @@ namespace rtmpsuck
                         {
                             prevTagSize = AMF.AMF_DecodeInt32(packetBody.Skip((int)pos + 11 + (int)dataSize).ToArray());
 
-                            // #ifdef _DEBUG
-                            if (false)
+#if _DEBUG
                             {
                                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
                                     "FLV Packet: type {0:2x}, dataSize: {1}, tagSize: {2}, timeStamp: {3} ms",
                                     packetBody[pos], dataSize, prevTagSize, nTimeStamp);
                             }
-                            // #endif
+#endif
 
                             if (prevTagSize != (dataSize + 11))
                             {
-                                // #ifdef _DEBUG
-                                if (false)
+#if _DEBUG
                                 {
                                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
                                       "Tag and data size are not consitent, writing tag size according to dataSize+11: {1}",
                                       dataSize + 11);
                                 }
-                                // #endif
+#endif
 
                                 prevTagSize = dataSize + 11;
                                 // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);

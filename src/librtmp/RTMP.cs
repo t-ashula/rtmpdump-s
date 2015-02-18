@@ -183,6 +183,19 @@ namespace librtmp
         /// <summary> RTMP_LNK Link </summary>
         public RTMP_LNK Link { get; set; }
 
+        /// <summary>R
+        /// uint32_t RTMP_GetTime()
+        /// </summary>
+        /// <returns></returns>
+        public static long RTMP_GetTime()
+        {
+#if _DEBUG
+            return 0
+#else
+            return DateTime.Now.Ticks;
+#endif
+        }
+
         // int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port, AVal *playpath, AVal *app);
         public static bool RTMP_ParseURL(string url, out int protocol, out AVal host, out int port, out AVal playpath, out AVal app)
         {
@@ -197,7 +210,13 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        // void RTMP_UpdateBufferMS(RTMP *r);
+        /// <summary>
+        /// void RTMP_UpdateBufferMS(RTMP *r);
+        /// </summary>
+        public static void RTMP_UpdateBufferMS(RTMP r)
+        {
+            throw new NotImplementedException();
+        }
 
         // int RTMP_SetOpt(RTMP *r, const AVal *opt, AVal *arg);
         public static bool RTMP_SetOpt(RTMP r, AVal opt, AVal arg)
@@ -274,7 +293,11 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        // double RTMP_GetDuration(RTMP *r);
+        /// <summary> double RTMP_GetDuration(RTMP *r); </summary>
+        public static double RTMP_GetDuration(RTMP r)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary> int RTMP_ToggleStream(RTMP* r); </summary>
         public static bool RTMP_ToggleStream(RTMP r)
@@ -370,7 +393,15 @@ namespace librtmp
         // int RTMP_SendServerBW(RTMP *r);
         // int RTMP_SendClientBW(RTMP *r);
         // void RTMP_DropRequest(RTMP *r, int i, int freeit);
-        // int RTMP_Read(RTMP *r, char *buf, int size);
+
+        /// <summary>
+        /// int RTMP_Read(RTMP *r, char *buf, int size);
+        /// </summary>
+        public static int RTMP_Read(RTMP r, byte[] buf, int size)
+        {
+            throw new NotImplementedException();
+        }
+
         // int RTMP_Write(RTMP *r, const char *buf, int size);
 
         /* hashswf.c */

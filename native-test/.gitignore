@@ -1,0 +1,7 @@
+# CppUTest
+*.gcov
+*.gcda
+*.gcno
+
+# target
+rtmptest

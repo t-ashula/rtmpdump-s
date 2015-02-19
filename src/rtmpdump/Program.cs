@@ -236,6 +236,7 @@ namespace rtmpdump
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Number of keyframes skipped must be greater or equal zero, using zero!");
                         nSkipKeyFrames = 0;
                     }
+
                     i++;
                 }
                 else if (arg == "-b" || arg == "--buffer")
@@ -1478,7 +1479,7 @@ namespace rtmpdump
             Log.RTMP_LogPrintf("--conn|-C type:data     Arbitrary AMF data to be appended to the connect string\n");
             Log.RTMP_LogPrintf("                        B:boolean(0|1), S:string, N:number, O:object-flag(0|1),\n");
             Log.RTMP_LogPrintf("                        Z:(null), NB:name:boolean, NS:name:string, NN:name:number\n");
-            Log.RTMP_LogPrintf("--flashVer|-f string    Flash version string (default: \"{0}\")\n", RTMP.RTMP_DefaultFlashVer.av_val);
+            Log.RTMP_LogPrintf("--flashVer|-f string    Flash version string (default: \"{0}\")\n", RTMP.RTMP_DefaultFlashVer.to_s());
             Log.RTMP_LogPrintf("--live|-v               Save a live stream, no --resume (seeking) of live streams possible\n");
             Log.RTMP_LogPrintf("--subscribe|-d string   Stream name to subscribe to (otherwise defaults to playpath if live is specifed)\n");
             Log.RTMP_LogPrintf("--realtime|-R           Don't attempt to speed up download via the Pause/Unpause BUFX hack\n");

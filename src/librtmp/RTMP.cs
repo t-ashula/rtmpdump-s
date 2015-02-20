@@ -485,7 +485,7 @@ namespace librtmp
         /// <summary> void RTMP_SetBufferMS(RTMP *r, int size);</summary>
         public static void RTMP_SetBufferMS(RTMP r, int size)
         {
-            throw new NotImplementedException();
+            r.m_nBufferMS = size;
         }
 
         /// <summary>

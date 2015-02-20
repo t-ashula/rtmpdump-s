@@ -166,6 +166,12 @@ namespace librtmp
 
             return new string(av_val.Select(b => (char)b).Take(len).ToArray());
         }
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            return string.Format("len:{0}, val({1}):[{2}]", av_len, av_val.Length, string.Join(",", av_val.Select(b => b.ToString("x02"))));
+        }
     }
 
     /// <summary> struct AMFObject </summary>

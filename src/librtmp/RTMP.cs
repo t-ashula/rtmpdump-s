@@ -266,7 +266,7 @@ namespace librtmp
                 return false;
             }
 
-            var end = url.Length - p;
+            var end = url.Length;
             var col = url.IndexOf(':', p);
             var ques = url.IndexOf('?', p);
             var slash = url.IndexOf('/', p);
@@ -310,7 +310,7 @@ namespace librtmp
                 }
             }
 
-            if (slash != -1)
+            if (slash == -1)
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "No application or playpath in URL!");
                 return true;

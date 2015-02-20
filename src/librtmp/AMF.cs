@@ -149,6 +149,17 @@ namespace librtmp
             };
         }
 
+        public AVal()
+            : this(new byte[0])
+        {
+        }
+
+        public AVal(byte[] val)
+        {
+            av_val = val;
+            av_len = val.Length;
+        }
+
         /// <summary> toString </summary>
         /// <param name="len"></param>
         /// <returns></returns>

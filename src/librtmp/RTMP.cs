@@ -515,12 +515,159 @@ namespace librtmp
         /// AVal *subscribepath,AVal *usherToken,int dStart,int dStop, int bLiveStream, long int timeout);
         /// </summary>
         public static void RTMP_SetupStream(RTMP r,
-            int protocol, AVal hostname, int port, AVal sockshost,
+            int protocol, AVal host, int port, AVal sockshost,
             AVal playpath, AVal tcUrl, AVal swfUrl, AVal pageUrl, AVal app,
             AVal auth, AVal swfSha256Hash, int swfSize, AVal flashVer,
             AVal subscribepath, AVal usherToken, int dStart, int dStop, bool bLiveStream, int timeout)
         {
-            throw new NotImplementedException();
+            #region dump-args
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Protocol : {0}", RTMPProtocolStrings[protocol & 7]);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Hostname : {0}", host.to_s());
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Port     : {0}", port);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Playpath : {0}", playpath.to_s());
+
+            if (tcUrl.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "tcUrl    : {0}", tcUrl.to_s());
+            }
+
+            if (swfUrl.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "swfUrl   : {0}", swfUrl.to_s());
+            }
+
+            if (pageUrl.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "pageUrl  : {0}", pageUrl.to_s());
+            }
+
+            if (app.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "app      : {0}", app.to_s());
+            }
+
+            if (auth.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "auth     : {0}", auth.to_s());
+            }
+
+            if (subscribepath.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "subscribepath : {0}", subscribepath.to_s());
+            }
+
+            if (usherToken.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "NetStream.Authenticate.UsherToken : {0}", usherToken.to_s());
+            }
+
+            if (flashVer.av_val.Length > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "flashVer : {0}", flashVer.to_s());
+            }
+
+            if (dStart > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "StartTime     : {0} msec", dStart);
+            }
+
+            if (dStop > 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "StopTime      : {0} msec", dStop);
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "live     : {0}", bLiveStream ? "yes" : "no");
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "timeout  : {0} sec", timeout);
+
+            #endregion
+
+#if CRYPTO
+    if (swfSHA256Hash != NULL && swfSize > 0)
+    {
+        memcpy(r.Link.SWFHash, swfSHA256Hash.av_val, sizeof(r.Link.SWFHash));
+        r.Link.SWFSize = swfSize;
+        RTMP_Log(RTMP_LOGDEBUG, "SWFSHA256:");
+        RTMP_LogHex(RTMP_LOGDEBUG, r.Link.SWFHash, sizeof(r.Link.SWFHash));
+        RTMP_Log(RTMP_LOGDEBUG, "SWFSize  : %u", r.Link.SWFSize);
+    }
+    else
+    {
+        r.Link.SWFSize = 0;
+    }
+#endif
+
+            SocksSetup(r, sockshost);
+
+            if (tcUrl.av_len > 0)
+            {
+                r.Link.tcUrl = tcUrl;
+            }
+            if (swfUrl.av_len > 0)
+            {
+                r.Link.swfUrl = swfUrl;
+            }
+            if (pageUrl.av_len > 0)
+            {
+                r.Link.pageUrl = pageUrl;
+            }
+            if (app.av_len > 0)
+            {
+                r.Link.app = app;
+            }
+
+            if (auth.av_len > 0)
+            {
+                r.Link.auth = auth;
+                r.Link.lFlags |= RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_AUTH;
+            }
+            if (flashVer.av_len > 0)
+            {
+                r.Link.flashVer = flashVer;
+            }
+            else
+            {
+                r.Link.flashVer = RTMP_DefaultFlashVer;
+            }
+
+            if (subscribepath.av_len > 0)
+            {
+                r.Link.subscribepath = subscribepath;
+            }
+
+            if (usherToken.av_len > 0)
+            {
+                r.Link.usherToken = usherToken;
+            }
+
+            r.Link.seekTime = dStart;
+            r.Link.stopTime = dStop;
+            if (bLiveStream)
+            {
+                r.Link.lFlags |= RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_LIVE;
+            }
+            r.Link.timeout = timeout;
+
+            r.Link.protocol = protocol;
+            r.Link.hostname = host;
+            r.Link.port = (ushort)port;
+            r.Link.playpath = playpath;
+
+            if (r.Link.port == 0)
+            {
+                if ((protocol & RTMP_FEATURE_SSL) != 0x00)
+                {
+                    r.Link.port = 443;
+                }
+                else if ((protocol & RTMP_FEATURE_HTTP) != 0x00)
+                {
+                    r.Link.port = 80;
+                }
+                else
+                {
+                    r.Link.port = 1935;
+                }
+            }
         }
 
         /// <summary> int RTMP_Connect(RTMP *r, RTMPPacket *cp); </summary>
@@ -682,6 +829,37 @@ namespace librtmp
 
         // int RTMP_Write(RTMP *r, const char *buf, int size);
 
+        private static void SocksSetup(RTMP r, AVal sockshost)
+        {
+            if (sockshost.av_len > 0)
+            {
+                var hostname = sockshost.av_val.TakeWhile(b => b != (byte)':').ToArray();
+                r.Link.sockshost = new AVal(hostname);
+
+                var socksport = sockshost.av_val.Contains((byte)':');
+                if (socksport)
+                {
+                    var t = new string(sockshost.av_val.Select(b => (char)b).SkipWhile(c => c != ':').Skip(1).ToArray());
+                    ushort port;
+                    if (!ushort.TryParse(t, out port))
+                    {
+                        port = 1080;
+                    }
+
+                    r.Link.socksport = port;
+                }
+
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                    "Connecting via SOCKS proxy: {0}:{1}",
+                    r.Link.sockshost.to_s(), r.Link.socksport);
+            }
+            else
+            {
+                r.Link.sockshost = new AVal(new byte[0]);
+                r.Link.socksport = 0;
+            }
+        }
+
         /* hashswf.c */
 
         /// <summary> int RTMP_HashSWF(const char *url, unsigned int *size, unsigned char *hash, int age); </summary>
@@ -705,7 +883,7 @@ namespace librtmp
     /// <summary> struct RTMPPacket </summary>
     public class RTMPPacket
     {
-        /// <summary> #define RTMPPacket_IsReady(a)  ((a)->m_nBytesRead == (a)->m_nBodySize) </summary>
+        /// <summary> #define RTMPPacket_IsReady(a)  ((a).m_nBytesRead == (a).m_nBodySize) </summary>
         public bool IsReady()
         {
             return BytesRead == BodySize;

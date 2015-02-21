@@ -26,6 +26,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 
 namespace librtmp
@@ -50,9 +51,54 @@ namespace librtmp
 
         public const int RTMP_DEFAULT_CHUNKSIZE = 128;
 
-        public const int RTMP_BUFFER_CACHE_SIZE = 16 * 2048;
+        public const int RTMP_BUFFER_CACHE_SIZE = 16 * 1024;
 
         public const int RTMP_CHANNELS = 65600;
+
+        /// <summary> #define RTMP_SIG_SIZE 1536 </summary>
+        private const int RTMP_SIG_SIZE = 1536;
+
+        /*      RTMP_PACKET_TYPE_...                0x00 */
+        private const int RTMP_PACKET_TYPE_CHUNK_SIZE = 0x01;
+        /*      RTMP_PACKET_TYPE_...                0x02 */
+        private const int RTMP_PACKET_TYPE_BYTES_READ_REPORT = 0x03;
+        private const int RTMP_PACKET_TYPE_CONTROL = 0x04;
+        private const int RTMP_PACKET_TYPE_SERVER_BW = 0x05;
+        private const int RTMP_PACKET_TYPE_CLIENT_BW = 0x06;
+        /*      RTMP_PACKET_TYPE_...                0x07 */
+        private const int RTMP_PACKET_TYPE_AUDIO = 0x08;
+        private const int RTMP_PACKET_TYPE_VIDEO = 0x09;
+        /*      RTMP_PACKET_TYPE_...                0x0A */
+        /*      RTMP_PACKET_TYPE_...                0x0B */
+        /*      RTMP_PACKET_TYPE_...                0x0C */
+        /*      RTMP_PACKET_TYPE_...                0x0D */
+        /*      RTMP_PACKET_TYPE_...                0x0E */
+        private const int RTMP_PACKET_TYPE_FLEX_STREAM_SEND = 0x0F;
+        private const int RTMP_PACKET_TYPE_FLEX_SHARED_OBJECT = 0x10;
+        private const int RTMP_PACKET_TYPE_FLEX_MESSAGE = 0x11;
+        private const int RTMP_PACKET_TYPE_INFO = 0x12;
+        private const int RTMP_PACKET_TYPE_SHARED_OBJECT = 0x13;
+        private const int RTMP_PACKET_TYPE_INVOKE = 0x14;
+        /*      RTMP_PACKET_TYPE_...                0x15 */
+        private const int RTMP_PACKET_TYPE_FLASH_VIDEO = 0x16;
+
+        /// <summary> #define RTMP_LARGE_HEADER_SIZE 12 </summary>
+        private const int RTMP_LARGE_HEADER_SIZE = 12;
+
+        /// <summary> #define RTMP_MAX_HEADER_SIZE 18</summary>
+        private const int RTMP_MAX_HEADER_SIZE = 18;
+
+        /// <summary> #define RTMP_PACKET_SIZE_LARGE    0</summary>
+        private const int RTMP_PACKET_SIZE_LARGE = 0;
+
+        /// <summary> #define RTMP_PACKET_SIZE_MEDIUM   1</summary>
+        private const int RTMP_PACKET_SIZE_MEDIUM = 1;
+
+        /// <summary> #define RTMP_PACKET_SIZE_SMALL    2</summary>
+        private const int RTMP_PACKET_SIZE_SMALL = 2;
+
+        /// <summary> #define RTMP_PACKET_SIZE_MINIMUM  3</summary>
+        private const int RTMP_PACKET_SIZE_MINIMUM = 3;
 
         public static readonly string[] RTMPProtocolStrings =
         {
@@ -119,7 +165,7 @@ namespace librtmp
         public byte m_bSendEncoding { get; set; }
 
         /// <summary> uint8_t m_bSendCounter </summary>
-        public byte m_bSendCounter { get; set; }
+        public bool m_bSendCounter { get; set; }
 
         /// <summary> int m_numInvokes </summary>
         public int m_numInvokes { get; set; }
@@ -188,12 +234,12 @@ namespace librtmp
         /// uint32_t RTMP_GetTime()
         /// </summary>
         /// <returns></returns>
-        public static long RTMP_GetTime()
+        public static uint RTMP_GetTime()
         {
-#if _DEBUG
-            return 0
+#if DEBUG
+            return 0;
 #else
-            return DateTime.Now.Ticks;
+            return (uint)DateTime.Now.Ticks;
 #endif
         }
 
@@ -587,9 +633,9 @@ namespace librtmp
     {
         memcpy(r.Link.SWFHash, swfSHA256Hash.av_val, sizeof(r.Link.SWFHash));
         r.Link.SWFSize = swfSize;
-        RTMP_Log(RTMP_LOGDEBUG, "SWFSHA256:");
+        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "SWFSHA256:");
         RTMP_LogHex(RTMP_LOGDEBUG, r.Link.SWFHash, sizeof(r.Link.SWFHash));
-        RTMP_Log(RTMP_LOGDEBUG, "SWFSize  : %u", r.Link.SWFSize);
+        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "SWFSize  : %u", r.Link.SWFSize);
     }
     else
     {
@@ -673,11 +719,149 @@ namespace librtmp
         /// <summary> int RTMP_Connect(RTMP *r, RTMPPacket *cp); </summary>
         public static bool RTMP_Connect(RTMP r, RTMPPacket cp)
         {
-            throw new NotImplementedException();
+            if (r.Link.hostname.av_len == 0)
+            {
+                return false;
+            }
+
+            var remote = r.Link.socksport != 0
+                ? new DnsEndPoint(r.Link.sockshost.to_s(), r.Link.socksport)
+                : new DnsEndPoint(r.Link.hostname.to_s(), r.Link.port);
+
+            if (!RTMP_Connect0(r, remote))
+            {
+                return false;
+            }
+
+            r.m_bSendCounter = true;
+
+            return RTMP_Connect1(r, cp);
         }
 
-        // int RTMP_Connect0(RTMP *r, struct sockaddr *svc);
-        // int RTMP_Connect1(RTMP *r, RTMPPacket *cp);
+        /// <summary> int RTMP_Connect0(RTMP *r, struct sockaddr *svc); </summary>
+        public static bool RTMP_Connect0(RTMP r, EndPoint remote)
+        {
+            const string __FUNCTION__ = "RTMP_Connect0";
+
+            r.m_sb.sb_timedout = false;
+            r.m_pausing = 0;
+            r.m_fDuration = 0.0;
+            try
+            {
+                r.m_sb.sb_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            }
+            catch (SocketException se)
+            {
+                // TODO:  GetSockError()
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to create socket. Error: {1}", __FUNCTION__, se.Message);
+                return false;
+            }
+
+            try
+            {
+                r.m_sb.sb_socket.Connect(remote);
+            }
+            catch (Exception ee)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to connect socket. ({1}) ", __FUNCTION__, ee.Message);
+                RTMP_Close(r);
+                return false;
+            }
+
+            if (r.Link.socksport != 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0} ... SOCKS negotiation", __FUNCTION__);
+                if (!SocksNegotiate(r))
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, SOCKS negotiation failed.", __FUNCTION__);
+                    RTMP_Close(r);
+                    return false;
+                }
+            }
+
+            // TODO: Socket.ReceiveTimeOut?
+            try
+            {
+                r.m_sb.sb_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, r.Link.timeout * 1000);
+            }
+            catch (SocketException)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, Setting socket timeout to {1}s failed!", __FUNCTION__, r.Link.timeout);
+            }
+
+            try
+            {
+                r.m_sb.sb_socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+            }
+            catch
+            {
+                // nothing;
+            }
+
+            return true;
+        }
+
+        /// <summary> int RTMP_Connect1(RTMP *r, RTMPPacket *cp); </summary>
+        public static bool RTMP_Connect1(RTMP r, RTMPPacket cp)
+        {
+            const string __FUNCTION__ = "RTMP_Connect1";
+
+            if ((r.Link.protocol & RTMP_FEATURE_SSL) != 0x00)
+            {
+#if CRYPTO_SSL // defined(CRYPTO) && !defined(NO_SSL)
+                TLS_client(RTMP_TLS_ctx, r.m_sb.sb_ssl);
+                TLS_setfd(r.m_sb.sb_ssl, r.m_sb.sb_socket);
+                if (TLS_connect(r.m_sb.sb_ssl) < 0)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, TLS_Connect failed", __FUNCTION__);
+                    RTMP_Close(r);
+                    return false;
+                }
+#else
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, no SSL/TLS support", __FUNCTION__);
+                RTMP_Close(r);
+                return false;
+
+#endif
+            }
+
+            if ((r.Link.protocol & RTMP_FEATURE_HTTP) != 0x00)
+            {
+                r.m_msgCounter = 1;
+                r.m_clientID.av_val = null;
+                r.m_clientID.av_len = 0;
+                HTTP_Post(r, RTMPTCmd.RTMPT_OPEN, new byte[1], 1);
+                if (HTTP_read(r, true) != 0)
+                {
+                    r.m_msgCounter = 0;
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Could not connect for handshake", __FUNCTION__);
+                    RTMP_Close(r);
+                    return false;
+                }
+
+                r.m_msgCounter = 0;
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, ... connected, handshaking", __FUNCTION__);
+            if (!HandShake(r, 1))
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, handshake failed.", __FUNCTION__);
+                RTMP_Close(r);
+                return false;
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, handshaked", __FUNCTION__);
+
+            if (!SendConnectPacket(r, cp))
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, RTMP connect failed.", __FUNCTION__);
+                RTMP_Close(r);
+                return false;
+            }
+
+            return true;
+        }
+
         /// <summary> int RTMP_Serve(RTMP *r); </summary>
         public static bool RTMP_Serve(RTMP r)
         {
@@ -765,7 +949,7 @@ namespace librtmp
                 RTMP_TLS_Init();
             }
 #endif
-            r.m_sb = new RTMPSockBuf { sb_socket = null };
+            r.m_sb = new RTMPSockBuf();
             r.m_inChunkSize = RTMP_DEFAULT_CHUNKSIZE;
             r.m_outChunkSize = RTMP_DEFAULT_CHUNKSIZE;
             r.m_nBufferMS = 30000;
@@ -829,6 +1013,7 @@ namespace librtmp
 
         // int RTMP_Write(RTMP *r, const char *buf, int size);
 
+        /// <summary> static void SocksSetup</summary>
         private static void SocksSetup(RTMP r, AVal sockshost)
         {
             if (sockshost.av_len > 0)
@@ -849,15 +1034,396 @@ namespace librtmp
                     r.Link.socksport = port;
                 }
 
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
-                    "Connecting via SOCKS proxy: {0}:{1}",
-                    r.Link.sockshost.to_s(), r.Link.socksport);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Connecting via SOCKS proxy: {0}:{1}", r.Link.sockshost.to_s(), r.Link.socksport);
             }
             else
             {
                 r.Link.sockshost = new AVal(new byte[0]);
                 r.Link.socksport = 0;
             }
+        }
+
+        /// <summary> static int SocksNegotiate(RTMP *r) </summary>
+        /// <remarks> SOCKS proxy does not support </remarks>
+        private static bool SocksNegotiate(RTMP r)
+        {
+            throw new NotImplementedException();
+        }
+
+        ///<summary> static int add_addr_info(struct sockaddr_in *service, AVal *host, int port) </summary>
+        private enum RTMPTCmd
+        {
+            RTMPT_OPEN = 0,
+            RTMPT_SEND,
+            RTMPT_IDLE,
+            RTMPT_CLOSE
+        };
+
+        /// <summary> static const char* RTMPT_cmds[]  </summary>
+        private static readonly Dictionary<RTMPTCmd, string> RTMPT_cmds = new Dictionary<RTMPTCmd, string>
+        {
+            { RTMPTCmd.RTMPT_OPEN, "open" },
+            { RTMPTCmd.RTMPT_SEND, "send" },
+            { RTMPTCmd.RTMPT_IDLE, "idle" },
+            { RTMPTCmd.RTMPT_CLOSE, "close" }
+        };
+
+        ///<summary> static int HTTP_Post(RTMP *r, RTMPTCmd cmd, const char *buf, int len) </summary>
+        private static int HTTP_Post(RTMP r, RTMPTCmd cmd, byte[] data, int len)
+        {
+            var req = string.Join("\r\n",
+                string.Format("POST /{0}{1}/{2} HTTP/1.1", RTMPT_cmds[cmd], r.m_clientID.to_s(), r.m_msgCounter),
+                string.Format("Host: {0}:{1}", r.Link.hostname.to_s(), r.Link.port),
+                "Accept: */*", "User-Agent: Shockwave Flash",
+                "Connection: Keep-Alive",
+                "Cache-Control: no-cache",
+                "Content-type: application/x-fcs",
+                string.Format("Content-length: {0}", len),
+                string.Empty);
+            var hbuf = req.ToCharArray().Select(c => (byte)c).ToArray();
+            var hlen = hbuf.Length;
+            RTMPSockBuf.RTMPSockBuf_Send(r.m_sb, hbuf, hlen);
+            hlen = RTMPSockBuf.RTMPSockBuf_Send(r.m_sb, data, len);
+            r.m_msgCounter++;
+            r.m_unackd++;
+            return hlen;
+        }
+
+        /// <summary> static int HTTP_read(RTMP *r, int fill)</summary>
+        /// <remarks> TODO: rewrite by WebClient(?)</remarks>
+        private static int HTTP_read(RTMP r, bool fill)
+        {
+            throw new NotImplementedException();
+        }
+
+#if CRYPTO
+#else
+
+        // static int HandShake(RTMP *r, int FP9HandShake)
+        private static bool HandShake(RTMP r, int FP9HandShake)
+        {
+            const string __FUNCTION__ = "HandShake";
+
+            byte[] clientbuf = new byte[RTMP_SIG_SIZE + 1];
+            byte[] serversig = new byte[RTMP_SIG_SIZE];
+
+            clientbuf[0] = 0x03; /* not encrypted */
+
+            var uptime = (int)IPAddress.HostToNetworkOrder(RTMP_GetTime()); // htonl(RTMP_GetTime());
+            var tmp = BitConverter.GetBytes(uptime);
+            // memcpy(clientsig, &uptime, 4);
+            for (var i = 0; i < 4; ++i)
+            {
+                clientbuf[1 + i] = tmp[i];
+            }
+            // memset(&clientsig[4], 0, 4);
+            for (var i = 0; i < 4; ++i)
+            {
+                clientbuf[1 + 4 + i] = 0;
+            }
+
+#if _DEBUG
+            for (var i = 8; i < RTMP_SIG_SIZE; i++)
+            {
+                clientbuf[1 + i] = 0xff;
+            }
+#else
+            var rand = new Random();
+            tmp = new byte[RTMP_SIG_SIZE];
+            rand.NextBytes(tmp);
+            for (var i = 8; i < RTMP_SIG_SIZE - 1; i++)
+            {
+                // clientsig[i] = (char)(rand() % 256);
+                clientbuf[1 + i] = tmp[i];
+            }
+#endif
+
+            if (!WriteN(r, clientbuf, RTMP_SIG_SIZE + 1))
+            {
+                return false;
+            }
+
+            if (ReadN(r, tmp, 1) != 1) /* 0x03 or 0x06 */
+            {
+                return false;
+            }
+
+            var type = tmp[0];
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Type Answer   : {1:X2}", __FUNCTION__, type);
+
+            if (type != clientbuf[0])
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "{0}: Type mismatch: client sent {1}, server answered {2}", __FUNCTION__, clientbuf[0], type);
+            }
+
+            if (ReadN(r, serversig, RTMP_SIG_SIZE) != RTMP_SIG_SIZE)
+            {
+                return false;
+            }
+
+            /* decode server response */
+            int suptime = BitConverter.ToInt32(serversig, 0);
+            // memcpy(&suptime, serversig, 4);
+            // suptime = ntohl(suptime);
+            suptime = IPAddress.NetworkToHostOrder(suptime);
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Server Uptime : {1}", __FUNCTION__, suptime);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: FMS Version   : {1}.{2}.{3}.{4}", __FUNCTION__, serversig[4], serversig[5], serversig[6], serversig[7]);
+
+            /* 2nd part of handshake */
+            if (!WriteN(r, serversig, RTMP_SIG_SIZE))
+            {
+                return false;
+            }
+
+            if (ReadN(r, serversig, RTMP_SIG_SIZE) != RTMP_SIG_SIZE)
+            {
+                return false;
+            }
+
+            var clientSig = clientbuf.Skip(1).Take(RTMP_SIG_SIZE).ToArray();
+
+            var bMatch = clientSig.SequenceEqual(serversig); // (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
+            if (!bMatch)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "{0}, client signature does not match!", __FUNCTION__);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, client signature = {1}\n", __FUNCTION__, clientSig[0]);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, server signature = {1}\n", __FUNCTION__, serversig[0]);
+            }
+
+            return true;
+        }
+
+#endif
+
+        // static int SendConnectPacket(RTMP *r, RTMPPacket* cp);
+        private static bool SendConnectPacket(RTMP r, RTMPPacket cp)
+        {
+            throw new NotImplementedException();
+        }
+
+        // static int WriteN(RTMP *r, const char *buffer, int n)
+        private static bool WriteN(RTMP r, byte[] buffer, int n)
+        {
+            const string __FUNCTION__ = "WriteN";
+#if CRYPTO
+    char *encrypted = 0;
+    char buf[RTMP_BUFFER_CACHE_SIZE];
+
+    if (r.Link.rc4keyOut)
+    {
+        if (n > sizeof(buf))
+            encrypted = (char *)malloc(n);
+        else
+            encrypted = (char *)buf;
+        ptr = encrypted;
+        RC4_encrypt2(r.Link.rc4keyOut, n, buffer, ptr);
+    }
+#endif
+
+            var ptr = 0;
+            var userHttp = (r.Link.protocol & RTMP_FEATURE_HTTP) != 0x00;
+            while (n > 0)
+            {
+                int nBytes = userHttp
+                    ? HTTP_Post(r, RTMPTCmd.RTMPT_SEND, buffer.Skip(ptr).ToArray(), n)
+                    : RTMPSockBuf.RTMPSockBuf_Send(r.m_sb, buffer.Skip(ptr).ToArray(), n);
+
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: {1}\n", __FUNCTION__, nBytes);
+
+                if (nBytes < 0)
+                {
+                    int sockerr = 0; // TODO: GetSockError();
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "%s, RTMP send error %d (%d bytes)", __FUNCTION__, sockerr, n);
+
+                    if (sockerr == 1 /*EINTR */&& !RTMP_ctrlC)
+                    {
+                        continue;
+                    }
+
+                    RTMP_Close(r);
+                    n = 1;
+                    break;
+                }
+
+                if (nBytes == 0)
+                {
+                    break;
+                }
+
+                n -= nBytes;
+                ptr += nBytes;
+            }
+
+#if CRYPTO
+    if (encrypted && encrypted != buf)
+        free(encrypted);
+#endif
+
+            return n == 0;
+        }
+
+        // static int ReadN(RTMP *r, char* buffer, int n)
+        private static int ReadN(RTMP r, byte[] buffer, int n)
+        {
+            const string __FUNCTION__ = "ReadN";
+            int nOriginalSize = n;
+            int avail;
+            // char* ptr;
+
+            r.m_sb.sb_timedout = false;
+
+#if _DEBUG
+            memset(buffer, 0, n);
+#endif
+
+            var ptr = 0; // buffer;
+            var useHttp = (r.Link.protocol & RTMP_FEATURE_HTTP) != 0x00;
+            while (n > 0)
+            {
+                int nBytes = 0, nRead;
+                if (useHttp)
+                {
+                    bool refill = false;
+                    while (r.m_resplen != 0)
+                    {
+                        int ret;
+                        if (r.m_sb.sb_size < 13 || refill)
+                        {
+                            if (r.m_unackd == 0)
+                            {
+                                HTTP_Post(r, RTMPTCmd.RTMPT_IDLE, new byte[1], 1);
+                            }
+
+                            if (RTMPSockBuf.RTMPSockBuf_Fill(r.m_sb) < 1)
+                            {
+                                if (!r.m_sb.sb_timedout)
+                                {
+                                    RTMP_Close(r);
+                                }
+
+                                return 0;
+                            }
+                        }
+                        if ((ret = HTTP_read(r, false)) == -1)
+                        {
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, No valid HTTP response found", __FUNCTION__);
+                            RTMP_Close(r);
+                            return 0;
+                        }
+                        else if (ret == -2)
+                        {
+                            refill = true;
+                        }
+                        else
+                        {
+                            refill = false;
+                        }
+                    }
+
+                    if (r.m_resplen != 0 && r.m_sb.sb_size == 0)
+                    {
+                        RTMPSockBuf.RTMPSockBuf_Fill(r.m_sb);
+                    }
+
+                    avail = r.m_sb.sb_size;
+                    if (avail > r.m_resplen)
+                    {
+                        avail = r.m_resplen;
+                    }
+                }
+                else
+                {
+                    avail = r.m_sb.sb_size;
+                    if (avail == 0)
+                    {
+                        if (RTMPSockBuf.RTMPSockBuf_Fill(r.m_sb) < 1)
+                        {
+                            if (!r.m_sb.sb_timedout)
+                            {
+                                RTMP_Close(r);
+                            }
+                            return 0;
+                        }
+
+                        avail = r.m_sb.sb_size;
+                    }
+                }
+
+                nRead = ((n < avail) ? n : avail);
+                if (nRead > 0)
+                {
+                    // memcpy(ptr, r.m_sb.sb_start, nRead);
+                    r.m_sb.sb_start += nRead;
+                    r.m_sb.sb_size -= nRead;
+                    nBytes = nRead;
+                    r.m_nBytesIn += nRead;
+                    if (r.m_bSendCounter && r.m_nBytesIn > (r.m_nBytesInSent + r.m_nClientBW / 10))
+                    {
+                        if (!SendBytesReceived(r))
+                        {
+                            return 0;
+                        }
+                    }
+                }
+                /*RTMP_Log(RTMP_LOGDEBUG, "%s: %d bytes\n", __FUNCTION__, nBytes); */
+#if _DEBUG
+                fwrite(ptr, 1, nBytes, netstackdump_read);
+#endif
+
+                if (nBytes == 0)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, RTMP socket closed by peer", __FUNCTION__);
+                    /*goto again; */
+                    RTMP_Close(r);
+                    break;
+                }
+
+                if (useHttp)
+                {
+                    r.m_resplen -= nBytes;
+                }
+
+#if CRYPTO
+                if (r.Link.rc4keyIn)
+                {
+                    RC4_encrypt(r.Link.rc4keyIn, nBytes, ptr);
+                }
+#endif
+
+                n -= nBytes;
+                ptr += nBytes;
+            }
+
+            return nOriginalSize - n;
+        }
+
+        // static int SendBytesReceived(RTMP *r)
+        private static bool SendBytesReceived(RTMP r)
+        {
+            RTMPPacket packet = new RTMPPacket
+            {
+                ChannnelNum = 0x02,
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_BYTES_READ_REPORT,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = 0,
+                Body = new byte[256],
+                BodySize = 4
+            };
+
+            /* control channel (invoke) */
+            var buf = new byte[256];
+            AMF.AMF_EncodeInt32(buf, r.m_nBytesIn); /* hard coded for now */
+            for (var i = 0; i < 256 - RTMP_MAX_HEADER_SIZE; ++i)
+            {
+                packet.Body[i + RTMP_MAX_HEADER_SIZE] = buf[i];
+            }
+            r.m_nBytesInSent = r.m_nBytesIn;
+
+            /*RTMP_Log(RTMP_LOGDEBUG, "Send bytes report. 0x%x (%d bytes)", (unsigned int)m_nBytesIn, m_nBytesIn); */
+            return RTMP_SendPacket(r, packet, false);
         }
 
         /* hashswf.c */
@@ -968,10 +1534,100 @@ namespace librtmp
         public byte[] sb_buf { get; set; }
 
         /// <summary> int sb_timedout; </summary>
-        public int sb_timedout { get; set; }
+        public bool sb_timedout { get; set; }
 
         /// <summary> void *sb_ssl; </summary>
         public object sb_ssl { get; set; }
+
+        public RTMPSockBuf()
+        {
+            sb_socket = null;
+            sb_size = 0;
+            sb_start = 0;
+            sb_timedout = false;
+            sb_buf = new byte[RTMP.RTMP_BUFFER_CACHE_SIZE];
+        }
+
+        /// <summary> int RTMPSockBuf_Fill(RTMPSockBuf *sb)</summary>
+        public static int RTMPSockBuf_Fill(RTMPSockBuf sb)
+        {
+            const string __FUNCTION__ = "RTMPSockBuf_Fill";
+            int nBytes;
+
+            if (sb.sb_size == 0)
+            {
+                sb.sb_start = 0; // = sb.sb_buf;
+            }
+
+            while (true)
+            {
+                // nBytes = sizeof (sb.sb_buf) - 1 - sb.sb_size - (sb.sb_start - sb.sb_buf);
+                nBytes = RTMP.RTMP_BUFFER_CACHE_SIZE - 1 - sb.sb_size - sb.sb_start;
+#if CRYPTO_SSL // defined(CRYPTO) && !defined(NO_SSL)
+        if (sb.sb_ssl)
+        {
+            nBytes = TLS_read(sb.sb_ssl, sb.sb_start + sb.sb_size, nBytes);
+        }
+        else
+#endif
+                {
+                    //  nBytes = recv(sb.sb_socket, sb.sb_start + sb.sb_size, nBytes, 0);
+
+                    nBytes = sb.sb_socket.Receive(sb.sb_buf, sb.sb_start + sb.sb_size, nBytes, SocketFlags.None);
+                }
+
+                if (nBytes != -1)
+                {
+                    sb.sb_size += nBytes;
+                }
+                else
+                {
+                    int sockerr = 0; // TODO: GetSockError();
+                    const int EINTR = 2;
+                    const int EWOULDBLOCK = 3;
+                    const int EAGAIN = 4;
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, recv returned {1}. GetSockError(): {2} ({3})", __FUNCTION__, nBytes, sockerr, string.Empty); // strerror(sockerr)
+                    if (sockerr == EINTR && !RTMP.RTMP_ctrlC)
+                    {
+                        continue;
+                    }
+
+                    if (sockerr == EWOULDBLOCK || sockerr == EAGAIN)
+                    {
+                        sb.sb_timedout = true;
+                        nBytes = 0;
+                    }
+                }
+
+                break;
+            }
+
+            return nBytes;
+        }
+
+        /// <summary> int RTMPSockBuf_Send(RTMPSockBuf *sb, const char *buf, int len) </summary>
+        public static int RTMPSockBuf_Send(RTMPSockBuf sb, byte[] buf, int len)
+        {
+            int rc;
+
+#if _DEBUG
+            fwrite(buf, 1, len, netstackdump);
+#endif
+
+#if CRYPTO_SSL // defined(CRYPTO) && !defined(NO_SSL)
+    if (sb.sb_ssl)
+    {
+        rc = TLS_write(sb.sb_ssl, buf, len);
+    }
+    else
+#endif
+            {
+                // rc = send(sb.sb_socket, buf, len, 0);
+                rc = sb.sb_socket.Send(buf);
+            }
+
+            return rc;
+        }
     }
 
     /// <summary>

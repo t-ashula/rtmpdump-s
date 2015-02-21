@@ -312,7 +312,7 @@ namespace rtmpsuck
                     return 1;
                 }
 
-                server.rc.m_bSendCounter = 0; // FALSE
+                server.rc.m_bSendCounter = false; // FALSE
             }
             else if (AVal.Match(method, av_play))
             {

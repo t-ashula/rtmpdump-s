@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -622,7 +623,7 @@ namespace rtmpsuck
                     //}
                 }
                 // char* ptr = *buf, *pend = ptr + size + 4;
-                uint ptr = 0, pend = size + 4;
+                int ptr = 0, pend = (int)size + 4;
                 /* audio (RTMP_PACKET_TYPE_AUDIO), video (RTMP_PACKET_TYPE_VIDEO)
                  * or metadata (RTMP_PACKET_TYPE_INFO) packets: construct 11 byte
                  * header then add rtmp packet's data.  */
@@ -633,24 +634,21 @@ namespace rtmpsuck
                     // set data type
                     //*dataType |= (((packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_AUDIO)<<2)|(packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_VIDEO));
 
-                    // (*nTimeStamp) = packet.TimeStamp;
                     nTimeStamp = packet.TimeStamp;
                     prevTagSize = 11 + nPacketLen;
 
-                    // *ptr++ = packet.PacketType;
                     buf[ptr] = packet.PacketType;
-                    ptr = (uint)AMF.AMF_EncodeInt24(buf, (int)nPacketLen);
-                    ptr = (uint)AMF.AMF_EncodeInt24(buf, (int)nTimeStamp);
-                    // *ptr = (char)(((*nTimeStamp) & 0xFF000000) >> 24);
+                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, (int)nPacketLen);
+                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, (int)nTimeStamp);
                     buf[ptr] = (byte)((nTimeStamp & 0xFF000000) >> 24);
                     ptr++;
 
                     // stream id
-                    ptr = (uint)AMF.AMF_EncodeInt24(buf, 0);
+                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, 0);
                 }
 
                 // memcpy(ptr, packetBody, nPacketLen);
-                uint ulen = nPacketLen;
+                int ulen = (int)nPacketLen;
 
                 // correct tagSize and obtain timestamp if we have an FLV stream
                 if (packet.PacketType == RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO)
@@ -677,7 +675,7 @@ namespace rtmpsuck
                             // we have to append a last tagSize!
                             prevTagSize = dataSize + 11;
                             // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);
-                            AMF.AMF_EncodeInt32(buf, (int)prevTagSize);
+                            AMF.AMF_EncodeInt32(buf, ptr, pend, (int)prevTagSize);
                             size += 4;
                             ulen += 4;
                         }
@@ -705,7 +703,7 @@ namespace rtmpsuck
 
                                 prevTagSize = dataSize + 11;
                                 // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);
-                                AMF.AMF_EncodeInt32(buf, (int)prevTagSize);
+                                AMF.AMF_EncodeInt32(buf, ptr, pend, (int)prevTagSize);
                             }
                         }
 
@@ -719,7 +717,7 @@ namespace rtmpsuck
                 {
                     // FLV tag packets contain their own prevTagSize
                     // AMF.AMF_EncodeInt32(ptr, pend, prevTagSize);
-                    AMF.AMF_EncodeInt32(buf, (int)prevTagSize);
+                    AMF.AMF_EncodeInt32(buf, ptr, pend, (int)prevTagSize);
                     //ptr += 4;
                 }
 
@@ -910,7 +908,7 @@ namespace rtmpsuck
                                         {
                                             // TODO:
                                             // AMF.AMF_EncodeInt32(ptr + 4, ptr + 8, BUFFERTIME);
-                                            AMF.AMF_EncodeInt32(null, BUFFERTIME);
+                                            AMF.AMF_EncodeInt32(ps.Body, 6, 10, BUFFERTIME);
                                         }
 
                                         // #endif

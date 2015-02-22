@@ -74,43 +74,173 @@ namespace librtmp
     /// <summary> for amf.c global functions </summary>
     public static class AMF
     {
-        // char *AMF_EncodeString(char *output, char *outend, const AVal * str);
-        // char *AMF_EncodeNumber(char *output, char *outend, double dVal);
-        // char *AMF_EncodeInt16(char *output, char *outend, short nVal);
-        /// <summary>  char *AMF_EncodeInt24(char *output, char *outend, int nVal);</summary>
-
-        public static int AMF_EncodeInt24(byte[] output, int val)
+        /// <summary> char *AMF_EncodeString(char *output, char *outend, const AVal * str);</summary>
+        public static int AMF_EncodeString(byte[] buf, int output, int outend, AVal str)
         {
-            throw new NotImplementedException();
+            if ((str.av_len < 65536 && output + 1 + 2 + str.av_len > outend) ||
+                output + 1 + 4 + str.av_len > outend)
+            {
+                return 0;
+            }
+
+            if (str.av_len < 65536)
+            {
+                // *output++ = AMF_STRING;
+                buf[output++] = (byte)AMFDataType.AMF_STRING;
+                output = AMF_EncodeInt16(buf, output, outend, (short)str.av_len);
+            }
+            else
+            {
+                buf[output++] = (byte)AMFDataType.AMF_LONG_STRING;
+                output = AMF_EncodeInt32(buf, output, outend, str.av_len);
+            }
+
+            memcpy(buf, output, str.av_val, str.av_len);
+
+            output += str.av_len;
+            return output;
+        }
+
+        /// <summary> char *AMF_EncodeNumber(char *output, char *outend, double dVal);</summary>
+        public static int AMF_EncodeNumber(byte[] buf, int output, int outend, double val)
+        {
+            if (output + 1 + 8 > outend)
+            {
+                return 0;
+            }
+
+            buf[output++] = (byte)AMFDataType.AMF_NUMBER;
+            var ci = BitConverter.GetBytes(val);
+            for (var i = 0; i < 8; ++i)
+            {
+                buf[output + i] = ci[7 - i];
+            }
+
+            return output + 8;
+        }
+
+        /// <summary> char *AMF_EncodeInt16(char *output, char *outend, short nVal);</summary>
+        public static int AMF_EncodeInt16(byte[] buf, int output, int outend, short nval)
+        {
+            if (output + 2 > outend)
+            {
+                return 0;
+            }
+
+            buf[output + 1] = (byte)(nval & 0xff);
+            buf[output + 0] = (byte)(nval >> 8);
+            return output + 2;
+        }
+
+        /// <summary>  char *AMF_EncodeInt24(char *output, char *outend, int nVal);</summary>
+        public static int AMF_EncodeInt24(byte[] buf, int output, int outend, int val)
+        {
+            if (output + 3 > outend)
+            {
+                return 0;
+            }
+
+            var ci = BitConverter.GetBytes(val);
+            buf[output + 2] = ci[3];
+            buf[output + 1] = ci[2];
+            buf[output + 0] = ci[1];
+            return output + 3;
         }
 
         /// <summary> char* AMF_EncodeInt32(char* output, char* outend, int nVal); </summary>
-        public static int AMF_EncodeInt32(byte[] output, int val)
+        public static int AMF_EncodeInt32(byte[] buf, int output, int outend, int val)
         {
-            throw new NotImplementedException();
+            if (output + 4 > outend)
+            {
+                return 0;
+            }
+
+            var ci = BitConverter.GetBytes(val);
+            buf[output + 3] = ci[3];
+            buf[output + 2] = ci[2];
+            buf[output + 1] = ci[1];
+            buf[output + 0] = ci[0];
+            return output + 4;
         }
 
         // char *AMF_EncodeBoolean(char *output, char *outend, int bVal);
+        public static int AMF_EncodeBoolean(byte[] buf, int output, int outend, bool val)
+        {
+            if (output + 2 > outend)
+            {
+                return 0;
+            }
+
+            buf[output++] = (byte)(AMFDataType.AMF_BOOLEAN);
+            buf[output++] = (byte)(val ? 0x01 : 0x00);
+            return output;
+        }
 
         /* Shortcuts for AMFProp_Encode */
-        // char *AMF_EncodeNamedString(char *output, char *outend, const AVal * name, const AVal * value);
-        // char *AMF_EncodeNamedNumber(char *output, char *outend, const AVal * name, double dVal);
-        // char *AMF_EncodeNamedBoolean(char *output, char *outend, const AVal * name, int bVal);
+
+        /// <summary> char *AMF_EncodeNamedString(char *output, char *outend, const AVal * name, const AVal * value);</summary>
+        public static int AMF_EncodeNamedString(byte[] buf, int output, int outend, AVal name, AVal value)
+        {
+            if (output + 2 + name.av_len > outend)
+            {
+                return 0;
+            }
+
+            var ret = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
+            output += ret;
+            // memcpy(output, name.av_val, name.av_len);
+            memcpy(buf, output, name.av_val, name.av_len);
+            output += name.av_len;
+
+            return AMF_EncodeString(buf, output, outend, value);
+        }
+
+        /// <summary> char *AMF_EncodeNamedNumber(char *output, char *outend, const AVal * name, double dVal);</summary>
+        public static int AMF_EncodeNamedNumber(byte[] buf, int output, int outend, AVal name, double val)
+        {
+            if (output + 2 + name.av_len > outend)
+            {
+                return 0;
+            }
+
+            output = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
+
+            memcpy(buf, output, name.av_val, name.av_len);
+            output += name.av_len;
+
+            return AMF_EncodeNumber(buf, output, outend, val);
+        }
+
+        /// <summary> char *AMF_EncodeNamedBoolean(char *output, char *outend, const AVal * name, int bVal);</summary>
+        public static int AMF_EncodeNamedBoolean(byte[] buf, int output, int outend, AVal name, bool val)
+        {
+            if (output + 2 + name.av_len > outend)
+            {
+                return 0;
+            }
+
+            output = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
+
+            memcpy(buf, output, name.av_val, name.av_len);
+            output += name.av_len;
+
+            return AMF_EncodeBoolean(buf, output, outend, val);
+        }
 
         /// <summary> unsigned short AMF_DecodeInt16(const char *data);</summary>
-        public static ushort AMF_DecodeInt16(byte[] data)
+        public static ushort AMF_DecodeInt16(byte[] data, int offset = 0)
         {
             throw new NotImplementedException();
         }
 
         /// <summary> unsigned int AMF_DecodeInt24(const char *data);</summary>
-        public static int AMF_DecodeInt24(byte[] data)
+        public static int AMF_DecodeInt24(byte[] data, int offset = 0)
         {
             throw new NotImplementedException();
         }
 
         /// <summary> unsigned int AMF_DecodeInt32(const char *data);</summary>
-        public static uint AMF_DecodeInt32(byte[] data)
+        public static uint AMF_DecodeInt32(byte[] data, int offset = 0)
         {
             throw new NotImplementedException();
         }
@@ -119,6 +249,14 @@ namespace librtmp
         // void AMF_DecodeLongString(const char *data, AVal * str);
         // int AMF_DecodeBoolean(const char *data);
         // double AMF_DecodeNumber(const char *data);
+
+        private static void memcpy(byte[] buf, int output, byte[] src, int len)
+        {
+            for (var i = 0; i < len; ++i)
+            {
+                buf[output + i] = src[i];
+            }
+        }
     }
 
     /// <summary> struct AVal; </summary>
@@ -336,6 +474,12 @@ namespace librtmp
 
         /// <summary> int AMFProp_IsValid(AMFObjectProperty* prop); </summary>
         public static int AMFProp_IsValid(AMFObjectProperty prop)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>char * AMFProp_Encode(AMFObjectProperty *prop, char *pBuffer, char *pBufEnd)</summary>
+        public static int AMFProp_Encode(AMFObjectProperty prop, byte[] buf, int offset, int pend)
         {
             throw new NotImplementedException();
         }

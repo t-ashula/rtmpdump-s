@@ -245,12 +245,22 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        // void AMF_DecodeString(const char *data, AVal * str);
+        /// <summary> void AMF_DecodeString(const char *data, AVal * str);</summary>
+        public static void AMF_DecodeString(byte[] buf, int offset, out AVal str)
+        {
+            throw new NotImplementedException();
+        }
+
         // void AMF_DecodeLongString(const char *data, AVal * str);
         // int AMF_DecodeBoolean(const char *data);
-        // double AMF_DecodeNumber(const char *data);
 
-        private static void memcpy(byte[] buf, int output, byte[] src, int len)
+        /// <summary> double AMF_DecodeNumber(const char *data);</summary>
+        public static double AMF_DecodeNumber(byte[] buf, int data = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static void memcpy(byte[] buf, int output, byte[] src, int len)
         {
             for (var i = 0; i < len; ++i)
             {

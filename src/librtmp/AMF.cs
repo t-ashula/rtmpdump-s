@@ -126,8 +126,9 @@ namespace librtmp
                 return 0;
             }
 
-            buf[output + 1] = (byte)(nval & 0xff);
-            buf[output + 0] = (byte)(nval >> 8);
+            var ci = BitConverter.GetBytes(nval);
+            buf[output + 1] = ci[0];
+            buf[output + 0] = ci[1];
             return output + 2;
         }
 
@@ -140,9 +141,9 @@ namespace librtmp
             }
 
             var ci = BitConverter.GetBytes(val);
-            buf[output + 2] = ci[3];
-            buf[output + 1] = ci[2];
-            buf[output + 0] = ci[1];
+            buf[output + 2] = ci[0];
+            buf[output + 1] = ci[1];
+            buf[output + 0] = ci[2];
             return output + 3;
         }
 
@@ -155,10 +156,10 @@ namespace librtmp
             }
 
             var ci = BitConverter.GetBytes(val);
-            buf[output + 3] = ci[3];
-            buf[output + 2] = ci[2];
-            buf[output + 1] = ci[1];
-            buf[output + 0] = ci[0];
+            buf[output + 3] = ci[0];
+            buf[output + 2] = ci[1];
+            buf[output + 1] = ci[2];
+            buf[output + 0] = ci[3];
             return output + 4;
         }
 
@@ -170,9 +171,9 @@ namespace librtmp
                 return 0;
             }
 
-            buf[output++] = (byte)(AMFDataType.AMF_BOOLEAN);
-            buf[output++] = (byte)(val ? 0x01 : 0x00);
-            return output;
+            buf[output + 0] = (byte)(AMFDataType.AMF_BOOLEAN);
+            buf[output + 1] = (byte)(val ? 0x01 : 0x00);
+            return output + 2;
         }
 
         /* Shortcuts for AMFProp_Encode */
@@ -187,7 +188,7 @@ namespace librtmp
 
             var ret = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
             output += ret;
-            // memcpy(output, name.av_val, name.av_len);
+
             memcpy(buf, output, name.av_val, name.av_len);
             output += name.av_len;
 
@@ -259,12 +260,17 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// memcpy; copy (src[0], src[len-1]) to (buf[output],buf[output+len-1])
+        /// </summary>
+        /// <param name="buf">destination</param>
+        /// <param name="output">destination</param>
+        /// <param name="src">source</param>
+        /// <param name="len">length</param>
         public static void memcpy(byte[] buf, int output, byte[] src, int len)
         {
-            for (var i = 0; i < len; ++i)
-            {
-                buf[output + i] = src[i];
-            }
+            // Array.ConstrainedCopy(src, 0, buf, output, len);
+            Array.Copy(src, 0, buf, output, len);
         }
     }
 

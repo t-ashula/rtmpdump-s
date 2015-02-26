@@ -15,7 +15,7 @@ namespace librtmp.Tests
             int output = 0, pend = buf.Length;
             output = AMF.AMF_EncodeString(buf, output, pend, app);
             Assert.AreEqual(6, output);
-            Assert.AreEqual(AMFDataType.AMF_STRING, buf[0]);
+            Assert.AreEqual((byte)AMFDataType.AMF_STRING, buf[0]);
             Assert.AreEqual(0, buf[1]);
             Assert.AreEqual(3, buf[2]);
             Assert.AreEqual('a', buf[3]);
@@ -41,7 +41,7 @@ namespace librtmp.Tests
             int enc = 0, pend = buf.Length;
             enc = AMF.AMF_EncodeNumber(buf, enc, pend, val);
             Assert.AreEqual(9, enc);
-            Assert.AreEqual(AMFDataType.AMF_NUMBER, buf[0]);
+            Assert.AreEqual((byte)AMFDataType.AMF_NUMBER, buf[0]);
             Assert.AreEqual(0xC0, buf[1]);
             Assert.AreEqual(0x02, buf[2]);
             Assert.AreEqual(0xC3, buf[3]);
@@ -71,10 +71,10 @@ namespace librtmp.Tests
             byte[] buf = new byte[100];
             int enc = 0, pend = buf.Length;
             enc = AMF.AMF_EncodeInt24(buf, enc, pend, val);
-            Assert.AreEqual(3, enc);
-            Assert.AreEqual(0x12, buf[0]);
-            Assert.AreEqual(0x34, buf[1]);
-            Assert.AreEqual(0x56, buf[2]);
+            Assert.AreEqual(3, enc, "result");
+            Assert.AreEqual(0x12, buf[0], "0");
+            Assert.AreEqual(0x34, buf[1], "1");
+            Assert.AreEqual(0x56, buf[2], "2");
         }
 
         [Test]
@@ -99,14 +99,14 @@ namespace librtmp.Tests
 
             enc = AMF.AMF_EncodeBoolean(buf, enc, pend, false);
             Assert.AreEqual(2, enc);
-            Assert.AreEqual(AMFDataType.AMF_BOOLEAN, buf[0]);
+            Assert.AreEqual((byte)AMFDataType.AMF_BOOLEAN, buf[0]);
             Assert.AreEqual(0x00, buf[1]);
 
             enc = 0;
             pend = buf.Length;
             enc = AMF.AMF_EncodeBoolean(buf, enc, pend, true);
             Assert.AreEqual(2, enc);
-            Assert.AreEqual(AMFDataType.AMF_BOOLEAN, buf[0]);
+            Assert.AreEqual((byte)AMFDataType.AMF_BOOLEAN, buf[0]);
             Assert.AreEqual(0x01, buf[1]);
         }
 
@@ -125,7 +125,7 @@ namespace librtmp.Tests
             Assert.AreEqual('a', buf[3]);
             Assert.AreEqual('m', buf[4]);
             Assert.AreEqual('e', buf[5]);
-            Assert.AreEqual(AMFDataType.AMF_STRING, buf[6]);
+            Assert.AreEqual((byte)AMFDataType.AMF_STRING, buf[6]);
             Assert.AreEqual(0x00, buf[7]);
             Assert.AreEqual(0x03, buf[8]);
             Assert.AreEqual('v', buf[9]);
@@ -141,7 +141,7 @@ namespace librtmp.Tests
             double val = -2.3456; // 0xC0 02 C3 C9 EE CB FB 16
             byte[] buf = new byte[100];
             int enc = 0, pend = buf.Length;
-            int len = 2 + 4 + 1 + 2 + 3; // "name".len + "name" + AMF_NUMBER + 8
+            int len = 2 + 4 + 1 + 8; // "name".len + "name" + AMF_NUMBER + 8
             enc = AMF.AMF_EncodeNamedNumber(buf, enc, pend, name, val);
             Assert.AreEqual(len, enc);
             Assert.AreEqual(0x00, buf[0]);
@@ -150,7 +150,7 @@ namespace librtmp.Tests
             Assert.AreEqual('a', buf[3]);
             Assert.AreEqual('m', buf[4]);
             Assert.AreEqual('e', buf[5]);
-            Assert.AreEqual(AMFDataType.AMF_NUMBER, buf[6]);
+            Assert.AreEqual((byte)AMFDataType.AMF_NUMBER, buf[6]);
             Assert.AreEqual(0xC0, buf[7]);
             Assert.AreEqual(0x02, buf[8]);
             Assert.AreEqual(0xC3, buf[9]);
@@ -176,7 +176,7 @@ namespace librtmp.Tests
             Assert.AreEqual('a', buf[3]);
             Assert.AreEqual('m', buf[4]);
             Assert.AreEqual('e', buf[5]);
-            Assert.AreEqual(AMFDataType.AMF_BOOLEAN, buf[6]);
+            Assert.AreEqual((byte)AMFDataType.AMF_BOOLEAN, buf[6]);
             Assert.AreEqual(0x01, buf[7]);
         }
 
@@ -213,7 +213,13 @@ namespace librtmp.Tests
         [Test]
         public void memcpyTest()
         {
-            Assert.Inconclusive();
+            var src = new byte[] { 0x01, 0x23, 0x45, 0x67, 0x89 };
+            var dst = new byte[src.Length];
+            AMF.memcpy(dst, 0, src, 3);
+            Assert.AreEqual(src[0], dst[0]);
+            Assert.AreEqual(src[1], dst[1]);
+            Assert.AreEqual(src[2], dst[2]);
+            Assert.AreEqual(0x00, dst[3]);
         }
     }
 }

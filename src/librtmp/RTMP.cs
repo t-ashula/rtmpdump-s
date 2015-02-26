@@ -25,7 +25,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -652,14 +651,17 @@ namespace librtmp
             {
                 r.Link.tcUrl = tcUrl;
             }
+
             if (swfUrl.av_len > 0)
             {
                 r.Link.swfUrl = swfUrl;
             }
+
             if (pageUrl.av_len > 0)
             {
                 r.Link.pageUrl = pageUrl;
             }
+
             if (app.av_len > 0)
             {
                 r.Link.app = app;
@@ -670,6 +672,7 @@ namespace librtmp
                 r.Link.auth = auth;
                 r.Link.lFlags |= RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_AUTH;
             }
+
             if (flashVer.av_len > 0)
             {
                 r.Link.flashVer = flashVer;
@@ -695,8 +698,8 @@ namespace librtmp
             {
                 r.Link.lFlags |= RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_LIVE;
             }
-            r.Link.timeout = timeout;
 
+            r.Link.timeout = timeout;
             r.Link.protocol = protocol;
             r.Link.hostname = host;
             r.Link.port = (ushort)port;
@@ -868,7 +871,7 @@ namespace librtmp
         /// <summary> int RTMP_Serve(RTMP *r); </summary>
         public static bool RTMP_Serve(RTMP r)
         {
-            throw new NotImplementedException();
+            return SHandShake(r);
         }
 
         // int RTMP_TLS_Accept(RTMP *r, void *ctx);
@@ -1463,6 +1466,93 @@ namespace librtmp
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "{0}, client signature does not match!", __FUNCTION__);
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, client signature = {1}\n", __FUNCTION__, clientSig[0]);
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, server signature = {1}\n", __FUNCTION__, serversig[0]);
+            }
+
+            return true;
+        }
+
+        // static int SHandShake(RTMP *r)
+        private static bool SHandShake(RTMP r)
+        {
+            const string __FUNCTION__ = "SHandShake";
+
+            // char serverbuf[RTMP_SIG_SIZE + 1], *serversig = serverbuf + 1;
+            byte[] serverbuf = new byte[RTMP_SIG_SIZE + 1];
+
+            if (ReadN(r, serverbuf, 1) != 1) /* 0x03 or 0x06 */
+            {
+                return false;
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Type Request  : {1:X02}", __FUNCTION__, serverbuf[0]);
+
+            if (serverbuf[0] != 3)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}: Type unknown: client sent {1:X02}", __FUNCTION__, serverbuf[0]);
+                return false;
+            }
+
+            // uptime = htonl(RTMP_GetTime());
+            var uptime = RTMP_GetTime();
+            var tmp = BitConverter.GetBytes(uptime);
+            // memcpy(serversig, &uptime, 4)
+            AMF.memcpy(serverbuf, 1, tmp, 4);
+
+            // memset(&serversig[4], 0, 4);
+            AMF.memcpy(serverbuf, 1 + 4, new byte[4], 4);
+#if _DEBUG
+            for (var i = 8; i < RTMP_SIG_SIZE; i++)
+            {
+                serverbuf[1 + i] = 0xff;
+            }
+#else
+            var rand = new Random();
+            tmp = new byte[RTMP_SIG_SIZE];
+            rand.NextBytes(tmp);
+            for (var i = 8; i < RTMP_SIG_SIZE; i++)
+            {
+                serverbuf[1 + i] = tmp[i];
+            }
+#endif
+
+            if (!WriteN(r, serverbuf, RTMP_SIG_SIZE + 1))
+            {
+                return false;
+            }
+
+            // char clientsig[RTMP_SIG_SIZE];
+            byte[] clientsig = new byte[RTMP_SIG_SIZE];
+            if (ReadN(r, clientsig, RTMP_SIG_SIZE) != RTMP_SIG_SIZE)
+            {
+                return false;
+            }
+
+            /* decode client response */
+
+            // memcpy(&uptime, clientsig, 4);
+            uptime = BitConverter.ToUInt32(clientsig, 0);
+            // uptime = IPAddress.NetworkToHostOrder(uptime);
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Client Uptime : {1}", __FUNCTION__, uptime);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Player Version: {1}.{2}.{3}.{4}", __FUNCTION__,
+                clientsig[4], clientsig[5], clientsig[6], clientsig[7]);
+
+            /* 2nd part of handshake */
+            if (!WriteN(r, clientsig, RTMP_SIG_SIZE))
+            {
+                return false;
+            }
+
+            if (ReadN(r, clientsig, RTMP_SIG_SIZE) != RTMP_SIG_SIZE)
+            {
+                return false;
+            }
+
+            var serversig = serverbuf.Skip(1).Take(RTMP_SIG_SIZE);
+            var bMatch = serversig.SequenceEqual(clientsig); // (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
+            if (!bMatch)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "{0}, client signature does not match!", __FUNCTION__);
             }
 
             return true;

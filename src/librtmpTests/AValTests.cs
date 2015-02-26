@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit;
+using NUnit.Framework;
 
 namespace librtmp.Tests
 {
-    [TestClass]
+    [TestFixture]
     public class AValTests
     {
-        [TestMethod]
+        [Test]
         public void MatchTest_Match()
         {
             var a = AVal.AVC("string1");
@@ -15,7 +16,7 @@ namespace librtmp.Tests
             Assert.IsTrue(AVal.Match(a, b));
         }
 
-        [TestMethod]
+        [Test]
         public void MatchTest_Unmatch()
         {
             var a = AVal.AVC("string1");
@@ -23,7 +24,7 @@ namespace librtmp.Tests
             Assert.IsFalse(AVal.Match(a, b));
         }
 
-        [TestMethod]
+        [Test]
         public void MatchTest_Empty()
         {
             AVal a = AVal.AVC(string.Empty), b = AVal.AVC(string.Empty);

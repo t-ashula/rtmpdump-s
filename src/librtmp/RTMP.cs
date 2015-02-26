@@ -1238,7 +1238,7 @@ namespace librtmp
         /// <summary> void RTMP_Close(RTMP *r); </summary>
         public static void RTMP_Close(RTMP r)
         {
-            throw new NotImplementedException();
+            CloseInternal(r, false);
         }
 
         //RTMP *RTMP_Alloc(void);
@@ -1898,7 +1898,7 @@ namespace librtmp
             // tmp = malloc(av.av_len + 1);
             var tmp = new byte[av.av_len + 1];
 
-            // memcpy(tmp, av->av_val, av.av_len);
+            // memcpy(tmp, av.av_val, av.av_len);
             for (var i = 0; i < av.av_len; ++i)
             {
                 tmp[i] = av.av_val[i];
@@ -1918,6 +1918,203 @@ namespace librtmp
             // (*vals)[(*num)++].name.av_val = tmp;
             vals[num] = m;
             num += 1;
+        }
+
+        // static void AV_clear(RTMP_METHOD* vals, int num)
+        private static void AV_clear(RTMP_METHOD[] vals, int num)
+        {
+            // for (var i = 0; i < num; i++) free(vals[i].name.av_val);
+            // free(vals);
+        }
+
+        // static void CloseInternal(RTMP *r, int reconnect)
+        private static void CloseInternal(RTMP r, bool reconnect)
+        {
+            if (RTMP_IsConnected(r))
+            {
+                if (r.m_stream_id > 0)
+                {
+                    var i = r.m_stream_id;
+                    r.m_stream_id = 0;
+                    if ((r.Link.protocol & RTMP_FEATURE_WRITE) != 0x00)
+                    {
+                        SendFCUnpublish(r);
+                    }
+
+                    SendDeleteStream(r, i);
+                }
+
+                if (r.m_clientID != null)
+                {
+                    HTTP_Post(r, RTMPTCmd.RTMPT_CLOSE, new byte[1], 1);
+                    // free(r.m_clientID.av_val);
+                    r.m_clientID.av_val = null;
+                    r.m_clientID.av_len = 0;
+                }
+
+                RTMPSockBuf.RTMPSockBuf_Close(r.m_sb);
+            }
+
+            r.m_stream_id = -1;
+            r.m_sb.sb_socket = null;
+            r.m_nBWCheckCounter = 0;
+            r.m_nBytesIn = 0;
+            r.m_nBytesInSent = 0;
+
+            if ((r.m_read.flags & RTMP_READ.RTMP_READ_HEADER) != 0x00)
+            {
+                // free(r.m_read.buf);
+                r.m_read.buf = null;
+            }
+            r.m_read.dataType = 0;
+            r.m_read.flags = 0;
+            r.m_read.status = 0;
+            r.m_read.nResumeTS = 0;
+            r.m_read.nIgnoredFrameCounter = 0;
+            r.m_read.nIgnoredFlvFrameCounter = 0;
+
+            r.m_write.BytesRead = 0;
+            RTMPPacket.RTMPPacket_Free(r.m_write);
+
+            for (var i = 0; i < r.m_channelsAllocatedIn; i++)
+            {
+                if (r.m_vecChannelsIn[i] != null)
+                {
+                    RTMPPacket.RTMPPacket_Free(r.m_vecChannelsIn[i]);
+                    // free(r.m_vecChannelsIn[i]);
+                    r.m_vecChannelsIn[i] = null;
+                }
+            }
+            // free(r.m_vecChannelsIn);
+            r.m_vecChannelsIn = null;
+            // free(r.m_channelTimestamp);
+            r.m_channelTimestamp = null;
+            r.m_channelsAllocatedIn = 0;
+            for (var i = 0; i < r.m_channelsAllocatedOut; i++)
+            {
+                if (r.m_vecChannelsOut[i] != null)
+                {
+                    // free(r.m_vecChannelsOut[i]);
+                    r.m_vecChannelsOut[i] = null;
+                }
+            }
+            // free(r.m_vecChannelsOut);
+            r.m_vecChannelsOut = null;
+            r.m_channelsAllocatedOut = 0;
+            AV_clear(r.m_methodCalls, r.m_numCalls);
+            r.m_methodCalls = null;
+            r.m_numCalls = 0;
+            r.m_numInvokes = 0;
+
+            r.m_bPlaying = 0; // FALSE
+            r.m_sb.sb_size = 0;
+
+            r.m_msgCounter = 0;
+            r.m_resplen = 0;
+            r.m_unackd = 0;
+
+            if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_FTCU) != 0x00 && !reconnect)
+            {
+                r.Link.tcUrl.av_val = null;
+                r.Link.lFlags ^= RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_FTCU;
+            }
+
+            if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_FAPU) != 0x00 && !reconnect)
+            {
+                r.Link.app.av_val = null;
+                r.Link.lFlags ^= RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_FAPU;
+            }
+
+            if (!reconnect)
+            {
+                r.Link.playpath0.av_val = null;
+            }
+#if CRYPTO
+            if (r.Link.dh)
+            {
+                MDH_free(r.Link.dh);
+                r.Link.dh = null;
+            }
+
+            if (r.Link.rc4keyIn)
+            {
+                RC4_free(r.Link.rc4keyIn);
+                r.Link.rc4keyIn = null;
+            }
+
+            if (r.Link.rc4keyOut)
+            {
+                RC4_free(r.Link.rc4keyOut);
+                r.Link.rc4keyOut = null;
+            }
+#endif
+        }
+
+        private static readonly AVal av_FCUnpublish = AVal.AVC("FCUnpublish");
+
+        // static int SendFCUnpublish(RTMP *r)
+        private static bool SendFCUnpublish(RTMP r)
+        {
+            // char pbuf [1024],*pend = pbuf + sizeof (pbuf);
+            var pbuf = new Byte[1024];
+            int pend = pbuf.Length;
+            // char* enc;
+
+            var enc = RTMP_MAX_HEADER_SIZE;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_FCUnpublish);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, r.Link.playpath);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03,
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = 0,
+                Body = pbuf,
+                BodySize = (uint)(enc - RTMP_MAX_HEADER_SIZE)
+            };
+            /* control channel (invoke) */
+            // - packet.m_body;
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        private static readonly AVal av_deleteStream = AVal.AVC("deleteStream");
+
+        // static int SendDeleteStream(RTMP *r, double dStreamId)
+        private static bool SendDeleteStream(RTMP r, double streamId)
+        {
+            var pbuf = new byte[256];
+            var pend = pbuf.Length;
+            int enc = RTMP_MAX_HEADER_SIZE; // packet.m_body;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_deleteStream);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, streamId);
+
+            RTMPPacket packet = new RTMPPacket
+            {
+                ChannelNum = 0x03,
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = 0,
+                Body = pbuf,
+                BodySize = (uint)(enc - RTMP_MAX_HEADER_SIZE)
+            };
+            /* control channel (invoke) */
+
+            /* no response expected */
+            return RTMP_SendPacket(r, packet, false);
         }
 
         /* hashswf.c */
@@ -2008,6 +2205,16 @@ namespace librtmp
         public const byte RTMP_PACKET_TYPE_INVOKE = 0x14;
         /*      RTMP_PACKET_TYPE_...                0x15 */
         public const byte RTMP_PACKET_TYPE_FLASH_VIDEO = 0x16;
+
+        // void RTMPPacket_Free(RTMPPacket *p)
+        public static void RTMPPacket_Free(RTMPPacket p)
+        {
+            if (p.Body != null)
+            {
+                // free(p->m_body - RTMP_MAX_HEADER_SIZE);
+                p.Body = null;
+            }
+        }
     }
 
     /// <summary>
@@ -2121,6 +2328,27 @@ namespace librtmp
             }
 
             return rc;
+        }
+
+        // int RTMPSockBuf_Close(RTMPSockBuf *sb)
+        public static int RTMPSockBuf_Close(RTMPSockBuf sb)
+        {
+#if CRYPTO_SSL
+  if (sb->sb_ssl)
+    {
+      TLS_shutdown(sb->sb_ssl);
+      TLS_close(sb->sb_ssl);
+      sb->sb_ssl = NULL;
+    }
+#endif
+            if (sb.sb_socket != null)
+            {
+                // return closesocket(sb->sb_socket);
+                sb.sb_socket.Close();
+                return 0;
+            }
+
+            return 0;
         }
     }
 

@@ -1,22 +1,22 @@
 ﻿using System;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 
 namespace librtmp.Tests
 {
-    [TestClass]
+    [TestFixture]
     public class RTMPTests
     {
         private const string EXAMPLE_URL = "rtmp://example.com:41935/app/plypath";
 
-        [TestInitialize]
+        [TestFixtureSetUp]
         public void Init()
         {
             Log.RTMP_LogSetLevel(Log.RTMP_LogLevel.RTMP_LOGALL);
             Log.RTMP_LogSetCallback((_, f, p) => Console.WriteLine(f, p));
         }
 
-        [TestMethod]
+        [Test]
         public void RTMP_ParseURLTest_example()
         {
             AVal host, app, playpath;

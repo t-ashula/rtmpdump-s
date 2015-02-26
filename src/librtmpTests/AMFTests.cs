@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using librtmp;
 using NUnit.Framework;
 
 namespace librtmp.Tests
@@ -14,91 +10,210 @@ namespace librtmp.Tests
         [Test]
         public void AMF_EncodeStringTest()
         {
-            Assert.Fail();
+            AVal app = AVal.AVC("app");
+            byte[] buf = new byte[50];
+            int output = 0, pend = buf.Length;
+            output = AMF.AMF_EncodeString(buf, output, pend, app);
+            Assert.AreEqual(6, output);
+            Assert.AreEqual(AMFDataType.AMF_STRING, buf[0]);
+            Assert.AreEqual(0, buf[1]);
+            Assert.AreEqual(3, buf[2]);
+            Assert.AreEqual('a', buf[3]);
+            Assert.AreEqual('p', buf[4]);
+            Assert.AreEqual('p', buf[5]);
+        }
+
+        [Test]
+        public void AMF_EncodeStringTest2()
+        {
+            AVal app = AVal.AVC("appp");
+            byte[] buf = new byte[4];
+            int enc = 0, pend = buf.Length;
+            enc = AMF.AMF_EncodeString(buf, enc, pend, app);
+            Assert.AreEqual(0, enc);
         }
 
         [Test]
         public void AMF_EncodeNumberTest()
         {
-            Assert.Fail();
+            double val = -2.3456; // 0xC0 02 C3 C9 EE CB FB 16
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            enc = AMF.AMF_EncodeNumber(buf, enc, pend, val);
+            Assert.AreEqual(9, enc);
+            Assert.AreEqual(AMFDataType.AMF_NUMBER, buf[0]);
+            Assert.AreEqual(0xC0, buf[1]);
+            Assert.AreEqual(0x02, buf[2]);
+            Assert.AreEqual(0xC3, buf[3]);
+            Assert.AreEqual(0xC9, buf[4]);
+            Assert.AreEqual(0xEE, buf[5]);
+            Assert.AreEqual(0xCB, buf[6]);
+            Assert.AreEqual(0xFB, buf[7]);
+            Assert.AreEqual(0x16, buf[8]);
         }
 
         [Test]
         public void AMF_EncodeInt16Test()
         {
-            Assert.Fail();
+            short sval = 0x1234;
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            enc = AMF.AMF_EncodeInt16(buf, enc, pend, sval);
+            Assert.AreEqual(2, enc);
+            Assert.AreEqual(0x12, buf[0]);
+            Assert.AreEqual(0x34, buf[1]);
         }
 
         [Test]
         public void AMF_EncodeInt24Test()
         {
-            Assert.Fail();
+            int val = 0x123456;
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            enc = AMF.AMF_EncodeInt24(buf, enc, pend, val);
+            Assert.AreEqual(3, enc);
+            Assert.AreEqual(0x12, buf[0]);
+            Assert.AreEqual(0x34, buf[1]);
+            Assert.AreEqual(0x56, buf[2]);
         }
 
         [Test]
         public void AMF_EncodeInt32Test()
         {
-            Assert.Fail();
+            int val = 0x12345678;
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            enc = AMF.AMF_EncodeInt32(buf, enc, pend, val);
+            Assert.AreEqual(4, enc);
+            Assert.AreEqual(0x12, buf[0]);
+            Assert.AreEqual(0x34, buf[1]);
+            Assert.AreEqual(0x56, buf[2]);
+            Assert.AreEqual(0x78, buf[3]);
         }
 
         [Test]
         public void AMF_EncodeBooleanTest()
         {
-            Assert.Fail();
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+
+            enc = AMF.AMF_EncodeBoolean(buf, enc, pend, false);
+            Assert.AreEqual(2, enc);
+            Assert.AreEqual(AMFDataType.AMF_BOOLEAN, buf[0]);
+            Assert.AreEqual(0x00, buf[1]);
+
+            enc = 0;
+            pend = buf.Length;
+            enc = AMF.AMF_EncodeBoolean(buf, enc, pend, true);
+            Assert.AreEqual(2, enc);
+            Assert.AreEqual(AMFDataType.AMF_BOOLEAN, buf[0]);
+            Assert.AreEqual(0x01, buf[1]);
         }
 
         [Test]
         public void AMF_EncodeNamedStringTest()
         {
-            Assert.Fail();
+            AVal name = AVal.AVC("name"), val = AVal.AVC("val");
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            int len = 2 + 4 + 1 + 2 + 3; // "name".len + "name" + AMF_STRING + "val".len + "val"
+            enc = AMF.AMF_EncodeNamedString(buf, enc, pend, name, val);
+            Assert.AreEqual(len, enc);
+            Assert.AreEqual(0x00, buf[0]);
+            Assert.AreEqual(0x04, buf[1]);
+            Assert.AreEqual('n', buf[2]);
+            Assert.AreEqual('a', buf[3]);
+            Assert.AreEqual('m', buf[4]);
+            Assert.AreEqual('e', buf[5]);
+            Assert.AreEqual(AMFDataType.AMF_STRING, buf[6]);
+            Assert.AreEqual(0x00, buf[7]);
+            Assert.AreEqual(0x03, buf[8]);
+            Assert.AreEqual('v', buf[9]);
+            Assert.AreEqual('a', buf[10]);
+            Assert.AreEqual('l', buf[11]);
+            Assert.AreEqual(0x00, buf[12]);
         }
 
         [Test]
         public void AMF_EncodeNamedNumberTest()
         {
-            Assert.Fail();
+            AVal name = AVal.AVC("name");
+            double val = -2.3456; // 0xC0 02 C3 C9 EE CB FB 16
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            int len = 2 + 4 + 1 + 2 + 3; // "name".len + "name" + AMF_NUMBER + 8
+            enc = AMF.AMF_EncodeNamedNumber(buf, enc, pend, name, val);
+            Assert.AreEqual(len, enc);
+            Assert.AreEqual(0x00, buf[0]);
+            Assert.AreEqual(0x04, buf[1]);
+            Assert.AreEqual('n', buf[2]);
+            Assert.AreEqual('a', buf[3]);
+            Assert.AreEqual('m', buf[4]);
+            Assert.AreEqual('e', buf[5]);
+            Assert.AreEqual(AMFDataType.AMF_NUMBER, buf[6]);
+            Assert.AreEqual(0xC0, buf[7]);
+            Assert.AreEqual(0x02, buf[8]);
+            Assert.AreEqual(0xC3, buf[9]);
+            Assert.AreEqual(0xC9, buf[10]);
+            Assert.AreEqual(0xEE, buf[11]);
+            Assert.AreEqual(0xCB, buf[12]);
+            Assert.AreEqual(0xFB, buf[13]);
+            Assert.AreEqual(0x16, buf[14]);
         }
 
         [Test]
         public void AMF_EncodeNamedBooleanTest()
         {
-            Assert.Fail();
+            AVal name = AVal.AVC("name");
+            byte[] buf = new byte[100];
+            int enc = 0, pend = buf.Length;
+            int len = 2 + 4 + 1 + 1; // "name".len + "name" + AMF_NUMBER + 8
+            enc = AMF.AMF_EncodeNamedBoolean(buf, enc, pend, name, true);
+            Assert.AreEqual(len, enc);
+            Assert.AreEqual(0x00, buf[0]);
+            Assert.AreEqual(0x04, buf[1]);
+            Assert.AreEqual('n', buf[2]);
+            Assert.AreEqual('a', buf[3]);
+            Assert.AreEqual('m', buf[4]);
+            Assert.AreEqual('e', buf[5]);
+            Assert.AreEqual(AMFDataType.AMF_BOOLEAN, buf[6]);
+            Assert.AreEqual(0x01, buf[7]);
         }
 
         [Test]
         public void AMF_DecodeInt16Test()
         {
-            Assert.Fail();
+            Assert.Inconclusive();
         }
 
         [Test]
         public void AMF_DecodeInt24Test()
         {
-            Assert.Fail();
+            Assert.Inconclusive();
         }
 
         [Test]
         public void AMF_DecodeInt32Test()
         {
-            Assert.Fail();
+            Assert.Inconclusive();
         }
 
         [Test]
         public void AMF_DecodeStringTest()
         {
-            Assert.Fail();
+            Assert.Inconclusive();
         }
 
         [Test]
         public void AMF_DecodeNumberTest()
         {
-            Assert.Fail();
+            Assert.Inconclusive();
         }
 
         [Test]
         public void memcpyTest()
         {
-            Assert.Fail();
+            Assert.Inconclusive();
         }
     }
 }

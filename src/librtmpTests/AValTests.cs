@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using NUnit;
 using NUnit.Framework;
 
 namespace librtmp.Tests

@@ -2081,8 +2081,6 @@ namespace librtmp
         {
             const string __FUNCTION__ = "ReadN";
             int nOriginalSize = n;
-            int avail;
-            // char* ptr;
 
             r.m_sb.sb_timedout = false;
 
@@ -2094,7 +2092,8 @@ namespace librtmp
             var useHttp = (r.Link.protocol & RTMP_FEATURE_HTTP) != 0x00;
             while (n > 0)
             {
-                int nBytes = 0, nRead;
+                int nBytes = 0;
+                int avail;
                 if (useHttp)
                 {
                     bool refill = false;
@@ -2121,7 +2120,7 @@ namespace librtmp
 
                         if ((ret = HTTP_read(r, false)) == -1)
                         {
-                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, No valid HTTP response found", __FUNCTION__);
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, No valid HTTP response found", __FUNCTION__);
                             RTMP_Close(r);
                             return 0;
                         }
@@ -2165,11 +2164,11 @@ namespace librtmp
                     }
                 }
 
-                nRead = ((n < avail) ? n : avail);
+                var nRead = ((n < avail) ? n : avail);
                 if (nRead > 0)
                 {
                     // memcpy(ptr, r.m_sb.sb_start, nRead);
-                    AMF.memcpy(buffer, ptr, r.m_sb.sb_buf, nRead);
+                    Array.Copy(r.m_sb.sb_buf, r.m_sb.sb_start, buffer, ptr, nRead);
                     r.m_sb.sb_start += nRead;
                     r.m_sb.sb_size -= nRead;
                     nBytes = nRead;

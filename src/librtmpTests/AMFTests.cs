@@ -135,6 +135,31 @@ namespace librtmp.Tests
         }
 
         [Test]
+        public void AMF_EncodeNamedStringTest2()
+        {
+            AVal name = AVal.AVC("name"), val = AVal.AVC("val");
+            byte[] buf = new byte[100];
+            int offset = 20;
+            int enc = offset, pend = buf.Length;
+            int len = 2 + 4 + 1 + 2 + 3; // "name".len + "name" + AMF_STRING + "val".len + "val"
+            enc = AMF.AMF_EncodeNamedString(buf, enc, pend, name, val);
+            Assert.AreEqual(len + offset, enc);
+            Assert.AreEqual(0x00, buf[0 + offset]);
+            Assert.AreEqual(0x04, buf[1 + offset]);
+            Assert.AreEqual('n', buf[2 + offset]);
+            Assert.AreEqual('a', buf[3 + offset]);
+            Assert.AreEqual('m', buf[4 + offset]);
+            Assert.AreEqual('e', buf[5 + offset]);
+            Assert.AreEqual((byte)AMFDataType.AMF_STRING, buf[6 + offset]);
+            Assert.AreEqual(0x00, buf[7 + offset]);
+            Assert.AreEqual(0x03, buf[8 + offset]);
+            Assert.AreEqual('v', buf[9 + offset]);
+            Assert.AreEqual('a', buf[10 + offset]);
+            Assert.AreEqual('l', buf[11 + offset]);
+            Assert.AreEqual(0x00, buf[12 + offset]);
+        }
+
+        [Test]
         public void AMF_EncodeNamedNumberTest()
         {
             AVal name = AVal.AVC("name");

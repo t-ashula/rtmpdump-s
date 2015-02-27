@@ -186,9 +186,7 @@ namespace librtmp
                 return 0;
             }
 
-            var ret = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
-            output += ret;
-
+            output = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
             memcpy(buf, output, name.av_val, name.av_len);
             output += name.av_len;
 

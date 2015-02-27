@@ -224,7 +224,7 @@ namespace librtmp
                     }
 
                     var c = (char)data[off + i];
-                    if (char.IsLetterOrDigit(c) || char.IsSymbol(c) || c == ' ')
+                    if (char.IsLetterOrDigit(c) || !char.IsControl(c) || char.IsSymbol(c) || c == ' ')
                     {
                         printable += c;
                     }

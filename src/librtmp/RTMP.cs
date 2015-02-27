@@ -725,7 +725,7 @@ namespace librtmp
         /// <summary> int RTMP_Connect(RTMP *r, RTMPPacket *cp); </summary>
         public static bool RTMP_Connect(RTMP r, RTMPPacket cp)
         {
-            if (r.Link.hostname.av_len == 0)
+            if (r.Link.hostname == null || r.Link.hostname.av_len == 0)
             {
                 return false;
             }
@@ -949,12 +949,15 @@ namespace librtmp
             // char *header, *hptr, *hend, hbuf[RTMP_MAX_HEADER_SIZE], c;
             byte[] hbuf = new byte[RTMP_MAX_HEADER_SIZE];
             int header, hend;
-            //if (packet.Body != null)
-            //{
-            //    header = -nSize; // packet.Body - nSize;
-            //    hend = 0; // packet.Body;
-            //}
-            //else
+            // TODO: packet.Body
+            if (packet.Body != null)
+            {
+                header = 0; // packet.Body - nSize;
+                hend = nSize; // packet.Body;
+                hbuf = new byte[nSize + packet.BodySize];
+                Array.Copy(packet.Body, 0, hbuf, nSize, packet.BodySize);
+            }
+            else
             {
                 header = 6; // hbuf + 6;
                 hend = hbuf.Length; // hbuf + sizeof(hbuf);
@@ -998,8 +1001,7 @@ namespace librtmp
                     break;
             }
 
-            // *hptr++ = c;
-            hbuf[hptr++] = (byte)c;
+            hbuf[hptr++] = (byte)c; // *hptr++ = c;
             if (cSize != 0)
             {
                 int tmp = packet.ChannelNum - 64;
@@ -1039,7 +1041,7 @@ namespace librtmp
             var nChunkSize = r.m_outChunkSize;
             byte[] tbuf = null;
             int toff = 0;
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}: fd={1}, size={2}", __FUNCTION__, r.m_sb.sb_socket, nSize);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}: fd={1}, size={2}", __FUNCTION__, r.m_sb.sb_socket.LocalEndPoint, nSize);
             /* send all chunks in one HTTP request */
             if ((r.Link.protocol & RTMP_FEATURE_HTTP) != 0x00)
             {
@@ -1060,8 +1062,8 @@ namespace librtmp
                     nChunkSize = nSize;
                 }
 
-                // Log.RTMP_LogHexString(Log.RTMP_LogLevel. RTMP_LOGDEBUG2, header, hSize);
-                // Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, buffer, nChunkSize);
+                Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, hbuf.Skip(header).ToArray(), (ulong)hSize);
+                Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, packet.Body.Skip(buffer).ToArray(), (ulong)nChunkSize);
                 if (tbuf != null)
                 {
                     // memcpy(toff, header, nChunkSize + hSize);
@@ -1168,7 +1170,7 @@ namespace librtmp
         /// <summary> int RTMP_IsConnected(RTMP *r); </summary>
         public static bool RTMP_IsConnected(RTMP r)
         {
-            throw new NotImplementedException();
+            return r.m_sb.sb_socket != null && r.m_sb.sb_socket.Connected;
         }
 
         // int RTMP_Socket(RTMP *r);
@@ -1236,6 +1238,8 @@ namespace librtmp
             r.m_fAudioCodecs = 3191.0;
             r.m_fVideoCodecs = 252.0;
             r.Link = new RTMP_LNK { timeout = 30, swfAge = 30 };
+            r.m_read = new RTMP_READ();
+            r.m_write = new RTMPPacket();
         }
 
         /// <summary> void RTMP_Close(RTMP *r); </summary>
@@ -1580,172 +1584,168 @@ namespace librtmp
         // static int SendConnectPacket(RTMP *r, RTMPPacket* cp);
         private static bool SendConnectPacket(RTMP r, RTMPPacket cp)
         {
+            const string __FUNCTION__ = "SendConnectPacket";
+            // char pbuf[4096], *pend = pbuf + sizeof(pbuf);
+            const int PBUF_SIZE = 4096;
+            byte[] pbuf = new byte[PBUF_SIZE];
+
+            if (cp != null)
             {
-                // char pbuf[4096], *pend = pbuf + sizeof(pbuf);
-                const int PBUF_SIZE = 4096;
-                byte[] pbuf = new byte[PBUF_SIZE];
-                int enc = 0;
+                return RTMP_SendPacket(r, cp, true);
+            }
 
-                if (cp != null)
+            RTMPPacket packet = new RTMPPacket
+            {
+                ChannelNum = 0x03,
+                HeaderType = RTMP_PACKET_SIZE_LARGE,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = 0,
+                Body = new byte[PBUF_SIZE - RTMP_MAX_HEADER_SIZE]
+            };
+            /* control channel (invoke) */
+
+            int pend = PBUF_SIZE;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(packet.Body, enc, pend, av_connect);
+            enc = AMF.AMF_EncodeNumber(packet.Body, enc, pend, ++r.m_numInvokes);
+            packet.Body[enc++] = (byte)AMFDataType.AMF_OBJECT; // *enc++ = AMFDataType. AMF_OBJECT;
+
+            enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_app, r.Link.app);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            if ((r.Link.protocol & RTMP_FEATURE_WRITE) != 0x00)
+            {
+                enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_type, av_nonprivate);
+                if (enc == 0)
                 {
-                    return RTMP_SendPacket(r, cp, true);
+                    return false;
                 }
+            }
 
-                RTMPPacket packet = new RTMPPacket
+            if (r.Link.flashVer != null && r.Link.flashVer.av_len > 0)
+            {
+                enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_flashVer, r.Link.flashVer);
+                if (enc == 0)
                 {
-                    ChannelNum = 0x03,
-                    HeaderType = RTMP_PACKET_SIZE_LARGE,
-                    PacketType = RTMP_PACKET_TYPE_INVOKE,
-                    TimeStamp = 0,
-                    InfoField2 = 0,
-                    HasAbsTimestamp = 0,
-                    Body = new byte[PBUF_SIZE - RTMP_MAX_HEADER_SIZE]
-                };
-                /* control channel (invoke) */
+                    return false;
+                }
+            }
 
-                int pend = PBUF_SIZE;
-                enc = 0; // packet.m_body;
-                enc = AMF.AMF_EncodeString(packet.Body, enc, pend, av_connect);
+            if (r.Link.swfUrl != null && r.Link.swfUrl.av_len > 0)
+            {
+                enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_swfUrl, r.Link.swfUrl);
+                if (enc == 0)
+                {
+                    return false;
+                }
+            }
 
-                enc = AMF.AMF_EncodeNumber(packet.Body, enc, pend, ++r.m_numInvokes);
-                // *enc++ = AMFDataType. AMF_OBJECT;
-                packet.Body[enc++] = (byte)AMFDataType.AMF_OBJECT;
+            if (r.Link.tcUrl != null && r.Link.tcUrl.av_len > 0)
+            {
+                enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_tcUrl, r.Link.tcUrl);
+                if (enc == 0)
+                {
+                    return false;
+                }
+            }
 
-                enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_app, r.Link.app);
+            if ((r.Link.protocol & RTMP_FEATURE_WRITE) == 0x00)
+            {
+                enc = AMF.AMF_EncodeNamedBoolean(packet.Body, enc, pend, av_fpad, false);
                 if (enc == 0)
                 {
                     return false;
                 }
 
-                if ((r.Link.protocol & RTMP_FEATURE_WRITE) != 0x00)
-                {
-                    enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_type, av_nonprivate);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-                }
-
-                if (r.Link.flashVer != null && r.Link.flashVer.av_len > 0)
-                {
-                    enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_flashVer, r.Link.flashVer);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-                }
-
-                if (r.Link.swfUrl != null && r.Link.swfUrl.av_len > 0)
-                {
-                    enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_swfUrl, r.Link.swfUrl);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-                }
-
-                if (r.Link.tcUrl != null && r.Link.tcUrl.av_len > 0)
-                {
-                    enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_tcUrl, r.Link.tcUrl);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-                }
-
-                if ((r.Link.protocol & RTMP_FEATURE_WRITE) == 0x00)
-                {
-                    enc = AMF.AMF_EncodeNamedBoolean(packet.Body, enc, pend, av_fpad, false);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-
-                    enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_capabilities, 15.0);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-
-                    enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_audioCodecs, r.m_fAudioCodecs);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-
-                    enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_videoCodecs, r.m_fVideoCodecs);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-
-                    enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_videoFunction, 1.0);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-
-                    if (r.Link.pageUrl != null && r.Link.pageUrl.av_len > 0)
-                    {
-                        enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_pageUrl, r.Link.pageUrl);
-                        if (enc == 0)
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                if (r.m_fEncoding != 0.0 || r.m_bSendEncoding != 0x00)
-                {
-                    /* AMF0, AMF3 not fully supported yet */
-                    enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_objectEncoding, r.m_fEncoding);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
-                }
-
-                if (enc + 3 >= pend)
+                enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_capabilities, 15.0);
+                if (enc == 0)
                 {
                     return false;
                 }
 
-                packet.Body[enc++] = 0;
-                packet.Body[enc++] = 0; /* end of object - 0x00 0x00 0x09 */
-                packet.Body[enc++] = (byte)AMFDataType.AMF_OBJECT_END;
-
-                /* add auth string */
-                if (r.Link.auth != null && r.Link.auth.av_len > 0)
+                enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_audioCodecs, r.m_fAudioCodecs);
+                if (enc == 0)
                 {
-                    enc = AMF.AMF_EncodeBoolean(packet.Body, enc, pend, (r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_AUTH) != 0x00);
-                    if (enc == 0)
-                    {
-                        return false;
-                    }
+                    return false;
+                }
 
-                    enc = AMF.AMF_EncodeString(packet.Body, enc, pend, r.Link.auth);
+                enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_videoCodecs, r.m_fVideoCodecs);
+                if (enc == 0)
+                {
+                    return false;
+                }
+
+                enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_videoFunction, 1.0);
+                if (enc == 0)
+                {
+                    return false;
+                }
+
+                if (r.Link.pageUrl != null && r.Link.pageUrl.av_len > 0)
+                {
+                    enc = AMF.AMF_EncodeNamedString(packet.Body, enc, pend, av_pageUrl, r.Link.pageUrl);
                     if (enc == 0)
                     {
                         return false;
                     }
                 }
-
-                if (r.Link.extras != null && r.Link.extras.o_num > 0)
-                {
-                    for (var i = 0; i < r.Link.extras.o_num; i++)
-                    {
-                        enc = AMFObjectProperty.AMFProp_Encode(r.Link.extras.o_props[i], packet.Body, enc, pend);
-                        if (enc == 0)
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                packet.BodySize = (uint)enc;
-
-                return RTMP_SendPacket(r, packet, true);
             }
+
+            if (r.m_fEncoding != 0.0 || r.m_bSendEncoding != 0x00)
+            {
+                /* AMF0, AMF3 not fully supported yet */
+                enc = AMF.AMF_EncodeNamedNumber(packet.Body, enc, pend, av_objectEncoding, r.m_fEncoding);
+                if (enc == 0)
+                {
+                    return false;
+                }
+            }
+
+            if (enc + 3 >= pend)
+            {
+                return false;
+            }
+
+            packet.Body[enc++] = 0;
+            packet.Body[enc++] = 0; /* end of object - 0x00 0x00 0x09 */
+            packet.Body[enc++] = (byte)AMFDataType.AMF_OBJECT_END;
+
+            /* add auth string */
+            if (r.Link.auth != null && r.Link.auth.av_len > 0)
+            {
+                enc = AMF.AMF_EncodeBoolean(packet.Body, enc, pend, (r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_AUTH) != 0x00);
+                if (enc == 0)
+                {
+                    return false;
+                }
+
+                enc = AMF.AMF_EncodeString(packet.Body, enc, pend, r.Link.auth);
+                if (enc == 0)
+                {
+                    return false;
+                }
+            }
+
+            if (r.Link.extras != null && r.Link.extras.o_num > 0)
+            {
+                for (var i = 0; i < r.Link.extras.o_num; i++)
+                {
+                    enc = AMFObjectProperty.AMFProp_Encode(r.Link.extras.o_props[i], packet.Body, enc, pend);
+                    if (enc == 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            packet.BodySize = (uint)enc;
+
+            return RTMP_SendPacket(r, packet, true);
         }
 
         // static int WriteN(RTMP *r, const char *buffer, int n)
@@ -1766,7 +1766,7 @@ namespace librtmp
         RC4_encrypt2(r.Link.rc4keyOut, n, buffer, ptr);
     }
 #endif
-
+            // Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, buffer, (ulong)n);
             var ptr = 0;
             var userHttp = (r.Link.protocol & RTMP_FEATURE_HTTP) != 0x00;
             while (n > 0)
@@ -1775,7 +1775,7 @@ namespace librtmp
                     ? HTTP_Post(r, RTMPTCmd.RTMPT_SEND, buffer.Skip(ptr).ToArray(), n)
                     : RTMPSockBuf.RTMPSockBuf_Send(r.m_sb, buffer.Skip(ptr).ToArray(), n);
 
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: {1}\n", __FUNCTION__, nBytes);
+                // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: {1}\n", __FUNCTION__, nBytes);
 
                 if (nBytes < 0)
                 {
@@ -1851,6 +1851,7 @@ namespace librtmp
                                 return 0;
                             }
                         }
+
                         if ((ret = HTTP_read(r, false)) == -1)
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, No valid HTTP response found", __FUNCTION__);
@@ -1889,6 +1890,7 @@ namespace librtmp
                             {
                                 RTMP_Close(r);
                             }
+
                             return 0;
                         }
 
@@ -1900,6 +1902,7 @@ namespace librtmp
                 if (nRead > 0)
                 {
                     // memcpy(ptr, r.m_sb.sb_start, nRead);
+                    AMF.memcpy(buffer, ptr, r.m_sb.sb_buf, nRead);
                     r.m_sb.sb_start += nRead;
                     r.m_sb.sb_size -= nRead;
                     nBytes = nRead;
@@ -1919,7 +1922,7 @@ namespace librtmp
 
                 if (nBytes == 0)
                 {
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s, RTMP socket closed by peer", __FUNCTION__);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, RTMP socket closed by peer", __FUNCTION__);
                     /*goto again; */
                     RTMP_Close(r);
                     break;
@@ -2117,7 +2120,7 @@ namespace librtmp
 
             if (!reconnect)
             {
-                r.Link.playpath0.av_val = null;
+                r.Link.playpath0 = null;
             }
 #if CRYPTO
             if (r.Link.dh)
@@ -2414,7 +2417,7 @@ namespace librtmp
 #endif
             {
                 // rc = send(sb.sb_socket, buf, len, 0);
-                rc = sb.sb_socket.Send(buf);
+                rc = sb.sb_socket.Send(buf, 0, len, SocketFlags.None);
             }
 
             return rc;

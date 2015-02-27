@@ -435,7 +435,7 @@ namespace rtmpsuck
                         }
                     }
 
-                    server.rc.m_bPlaying = 1; // TRUE
+                    server.rc.m_bPlaying = true;
                 }
 
                 // Return 1 if this is a Play.Complete or Play.Stop
@@ -805,8 +805,8 @@ namespace rtmpsuck
             }
 
             var buf = new byte[0];
-            var rk = new List<RTMPChunk>();
-            RTMPPacket pc = new RTMPPacket { Chunk = rk };
+            var rk = new RTMPChunk();
+            RTMPPacket pc = new RTMPPacket { Chunk = rk }; // TODO: !!!
             server.rc.Link.timeout = 10;
             server.rs.Link.timeout = 10;
             while (RTMP.RTMP_IsConnected(server.rs) || RTMP.RTMP_IsConnected(server.rc))
@@ -1011,7 +1011,7 @@ namespace rtmpsuck
                         if (sendit != 0 && RTMP.RTMP_IsConnected(server.rs))
                         {
                             // TODO: RTMPChunk!!
-                            RTMP.RTMP_SendChunk(server.rs, rk[0]);
+                            RTMP.RTMP_SendChunk(server.rs, rk);
                         }
 
                         if (pc.IsReady())

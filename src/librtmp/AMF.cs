@@ -228,27 +228,28 @@ namespace librtmp
         /// <summary> unsigned short AMF_DecodeInt16(const char *data);</summary>
         public static ushort AMF_DecodeInt16(byte[] data, int offset = 0)
         {
-            throw new NotImplementedException();
+            return (ushort)((data[offset] << 8) | data[offset + 1]);
         }
 
         /// <summary> unsigned int AMF_DecodeInt24(const char *data);</summary>
         public static uint AMF_DecodeInt24(byte[] data, int offset = 0)
         {
-            throw new NotImplementedException();
+            return (uint)((data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2]);
         }
 
         /// <summary> unsigned int AMF_DecodeInt32(const char *data);</summary>
         public static uint AMF_DecodeInt32(byte[] data, int offset = 0)
         {
-            throw new NotImplementedException();
+            return (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
         }
 
         /// <summary> void AMF_DecodeString(const char *data, AVal * str);</summary>
         public static void AMF_DecodeString(byte[] buf, int offset, out AVal str)
         {
-            var len = AMF_DecodeInt16(buf);
+            var lenbuf = new[] { buf[offset], buf[offset + 1] };
+            var len = AMF_DecodeInt16(lenbuf);
             var data = new byte[len];
-            Array.Copy(buf, 2, data, 0, len);
+            Array.Copy(buf, offset + 2, data, 0, len);
             str = new AVal(data);
         }
 
@@ -256,9 +257,10 @@ namespace librtmp
         // int AMF_DecodeBoolean(const char *data);
 
         /// <summary> double AMF_DecodeNumber(const char *data);</summary>
-        public static double AMF_DecodeNumber(byte[] buf, int data = 0)
+        public static double AMF_DecodeNumber(byte[] buf, int offset = 0)
         {
-            throw new NotImplementedException();
+            var d = buf.Skip(offset).Take(8).Reverse().ToArray();
+            return BitConverter.ToDouble(d, 0);
         }
 
         /// <summary>

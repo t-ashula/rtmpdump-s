@@ -255,7 +255,13 @@ namespace librtmp.Tests
         [Test]
         public void AMF_DecodeNumberTest()
         {
-            Assert.Inconclusive();
+            double expected = -2.3456, actual;
+            var buf = new byte[100];
+            int enc = 0;
+            var pend = buf.Length;
+            AMF.AMF_EncodeNumber(buf, enc, pend, expected);
+            actual = AMF.AMF_DecodeNumber(buf, 1); // skip AMFDatatype
+            Assert.AreEqual(expected, actual);
         }
 
         [Test]

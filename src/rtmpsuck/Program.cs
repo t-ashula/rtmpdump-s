@@ -638,8 +638,8 @@ namespace rtmpsuck
                     prevTagSize = 11 + nPacketLen;
 
                     buf[ptr] = packet.PacketType;
-                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, (int)nPacketLen);
-                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, (int)nTimeStamp);
+                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, nPacketLen);
+                    ptr = AMF.AMF_EncodeInt24(buf, ptr, pend, nTimeStamp);
                     buf[ptr] = (byte)((nTimeStamp & 0xFF000000) >> 24);
                     ptr++;
 
@@ -675,7 +675,7 @@ namespace rtmpsuck
                             // we have to append a last tagSize!
                             prevTagSize = dataSize + 11;
                             // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);
-                            AMF.AMF_EncodeInt32(buf, ptr, pend, (int)prevTagSize);
+                            AMF.AMF_EncodeInt32(buf, ptr, pend, prevTagSize);
                             size += 4;
                             ulen += 4;
                         }
@@ -703,7 +703,7 @@ namespace rtmpsuck
 
                                 prevTagSize = dataSize + 11;
                                 // AMF.AMF_EncodeInt32(ptr + pos + 11 + dataSize, pend, prevTagSize);
-                                AMF.AMF_EncodeInt32(buf, ptr, pend, (int)prevTagSize);
+                                AMF.AMF_EncodeInt32(buf, ptr, pend, prevTagSize);
                             }
                         }
 
@@ -717,7 +717,7 @@ namespace rtmpsuck
                 {
                     // FLV tag packets contain their own prevTagSize
                     // AMF.AMF_EncodeInt32(ptr, pend, prevTagSize);
-                    AMF.AMF_EncodeInt32(buf, ptr, pend, (int)prevTagSize);
+                    AMF.AMF_EncodeInt32(buf, ptr, pend, prevTagSize);
                     //ptr += 4;
                 }
 

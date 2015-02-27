@@ -1016,12 +1016,12 @@ namespace librtmp
 
             if (nSize > 1)
             {
-                hptr = AMF.AMF_EncodeInt24(hbuf, hptr, hend, (int)(t > 0xffffff ? 0xffffff : t));
+                hptr = AMF.AMF_EncodeInt24(hbuf, hptr, hend, t > 0xffffff ? 0xffffff : t);
             }
 
             if (nSize > 4)
             {
-                hptr = AMF.AMF_EncodeInt24(hbuf, hptr, hend, (int)packet.BodySize);
+                hptr = AMF.AMF_EncodeInt24(hbuf, hptr, hend, packet.BodySize);
                 // *hptr++ = packet.PacketType;
                 hbuf[hptr++] = packet.PacketType;
             }
@@ -1033,7 +1033,7 @@ namespace librtmp
 
             if (t >= 0xffffff)
             {
-                hptr = AMF.AMF_EncodeInt32(hbuf, hptr, hend, (int)t);
+                hptr = AMF.AMF_EncodeInt32(hbuf, hptr, hend, t);
             }
 
             nSize = (int)packet.BodySize; // TODO: uint
@@ -1116,7 +1116,7 @@ namespace librtmp
                     if (t >= 0xffffff)
                     {
                         var extendedTimestamp = header + 1 + cSize;
-                        AMF.AMF_EncodeInt32(hbuf, extendedTimestamp, extendedTimestamp + 4, (int)t);
+                        AMF.AMF_EncodeInt32(hbuf, extendedTimestamp, extendedTimestamp + 4, t);
                     }
                 }
             }
@@ -1966,7 +1966,7 @@ namespace librtmp
             var buf = new byte[256];
             var pbuf = 0;
             var pend = 256;
-            AMF.AMF_EncodeInt32(buf, pbuf, pend, r.m_nBytesIn); /* hard coded for now */
+            AMF.AMF_EncodeInt32(buf, pbuf, pend, (uint)r.m_nBytesIn); /* hard coded for now */
             for (var i = 0; i < 256 - RTMP_MAX_HEADER_SIZE; ++i)
             {
                 packet.Body[i + RTMP_MAX_HEADER_SIZE] = buf[i];

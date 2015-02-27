@@ -58,7 +58,7 @@ namespace librtmp.Tests
             short sval = 0x1234;
             byte[] buf = new byte[100];
             int enc = 0, pend = buf.Length;
-            enc = AMF.AMF_EncodeInt16(buf, enc, pend, sval);
+            enc = AMF.AMF_EncodeInt16(buf, enc, pend, (ushort)sval);
             Assert.AreEqual(2, enc);
             Assert.AreEqual(0x12, buf[0]);
             Assert.AreEqual(0x34, buf[1]);
@@ -70,7 +70,7 @@ namespace librtmp.Tests
             int val = 0x123456;
             byte[] buf = new byte[100];
             int enc = 0, pend = buf.Length;
-            enc = AMF.AMF_EncodeInt24(buf, enc, pend, val);
+            enc = AMF.AMF_EncodeInt24(buf, enc, pend, (uint)val);
             Assert.AreEqual(3, enc, "result");
             Assert.AreEqual(0x12, buf[0], "0");
             Assert.AreEqual(0x34, buf[1], "1");
@@ -83,7 +83,7 @@ namespace librtmp.Tests
             int val = 0x12345678;
             byte[] buf = new byte[100];
             int enc = 0, pend = buf.Length;
-            enc = AMF.AMF_EncodeInt32(buf, enc, pend, val);
+            enc = AMF.AMF_EncodeInt32(buf, enc, pend, (uint)val);
             Assert.AreEqual(4, enc);
             Assert.AreEqual(0x12, buf[0]);
             Assert.AreEqual(0x34, buf[1]);
@@ -208,25 +208,48 @@ namespace librtmp.Tests
         [Test]
         public void AMF_DecodeInt16Test()
         {
-            Assert.Inconclusive();
+            ushort expected = 0x1234;
+            var buf = new byte[100];
+            AMF.AMF_EncodeInt16(buf, 0, buf.Length, expected);
+            var actual = AMF.AMF_DecodeInt16(buf);
+            Assert.AreEqual(expected, actual);
         }
 
         [Test]
         public void AMF_DecodeInt24Test()
         {
-            Assert.Inconclusive();
+            uint expected = 0x123456;
+            var buf = new byte[100];
+            AMF.AMF_EncodeInt24(buf, 0, buf.Length, expected);
+            var actual = AMF.AMF_DecodeInt24(buf);
+            Assert.AreEqual(expected, actual);
         }
 
         [Test]
         public void AMF_DecodeInt32Test()
         {
-            Assert.Inconclusive();
+            uint expected = 0x12345678;
+            var buf = new byte[100];
+            AMF.AMF_EncodeInt32(buf, 0, buf.Length, expected);
+            var actual = AMF.AMF_DecodeInt32(buf);
+            Assert.AreEqual(expected, actual);
         }
 
         [Test]
         public void AMF_DecodeStringTest()
         {
-            Assert.Inconclusive();
+            var buf = new byte[100];
+            AVal str = AVal.AVC("foobar");
+            AMF.AMF_EncodeString(buf, 0, buf.Length, str);
+            AVal actual;
+            AMF.AMF_DecodeString(buf, 1, out actual); // Skip AMFDatatype flag
+            Assert.AreEqual(6, actual.av_len);
+            Assert.AreEqual('f', actual.av_val[0]);
+            Assert.AreEqual('o', actual.av_val[1]);
+            Assert.AreEqual('o', actual.av_val[2]);
+            Assert.AreEqual('b', actual.av_val[3]);
+            Assert.AreEqual('a', actual.av_val[4]);
+            Assert.AreEqual('r', actual.av_val[5]);
         }
 
         [Test]

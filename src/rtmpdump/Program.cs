@@ -74,7 +74,7 @@ namespace rtmpdump
             // int bResume = FALSE; // true in resume mode
             bool bResume = false;
 
-            int dSeek = 0; // uint32_t dSeek = 0; // seek position in resume mode, 0 otherwise
+            uint dSeek = 0; // uint32_t dSeek = 0; // seek position in resume mode, 0 otherwise
             int bufferTime = DEF_BUFTIME; // uint32_t bufferTime = DEF_BUFTIME;
 
             // meta header and initial frame for the resume mode (they are read from the file and compared with
@@ -574,7 +574,7 @@ namespace rtmpdump
                 RTMP.RTMP_SetupStream(
                     rtmp, protocol, hostname, port, sockshost, playpath,
                     tcUrl, swfUrl, pageUrl, app, auth, swfHash, swfSize,
-                    flashVer, subscribepath, usherToken, dSeek, dStopOffset, bLiveStream, timeout);
+                    flashVer, subscribepath, usherToken, (int)dSeek, dStopOffset, bLiveStream, timeout);
             }
             else
             {
@@ -675,7 +675,7 @@ namespace rtmpdump
                         }
                         else
                         {
-                            dSeek = dStartOffset;
+                            dSeek = (uint)dStartOffset;
                         }
                     }
                     // Calculate the length of the stream to still play
@@ -690,7 +690,7 @@ namespace rtmpdump
                         }
                     }
 
-                    if (!RTMP.RTMP_ConnectStream(rtmp, dSeek))
+                    if (!RTMP.RTMP_ConnectStream(rtmp, (int)dSeek))
                     {
                         nStatus = RD_STATUS.RD_FAILED;
                         break;
@@ -713,7 +713,7 @@ namespace rtmpdump
                     {
                         /* Only one try at reconnecting... */
                         retries = 1;
-                        dSeek = (int)rtmp.m_pauseStamp; // TODO:
+                        dSeek = rtmp.m_pauseStamp; // TODO:
                         if (dStopOffset > 0)
                         {
                             if (dStopOffset <= dSeek)
@@ -724,7 +724,7 @@ namespace rtmpdump
                             }
                         }
 
-                        if (!RTMP.RTMP_ReconnectStream(rtmp, dSeek))
+                        if (!RTMP.RTMP_ReconnectStream(rtmp, (int)dSeek))
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Failed to resume the stream\n\n");
                             nStatus = RTMP.RTMP_IsTimedout(rtmp) ? RD_STATUS.RD_INCOMPLETE : RD_STATUS.RD_FAILED;
@@ -797,7 +797,7 @@ namespace rtmpdump
             ref double duration)
         {
             var __FUNCTION__ = "OpenResumeFile";
-            var bufferSize = 0; // size_t bufferSize = 0;
+            var bufferSize = 0u; // size_t bufferSize = 0;
             var hbuf = new byte[16]; // char hbuf [16], *buffer = NULL;
             var buffer = new byte[0];
 
@@ -906,7 +906,7 @@ namespace rtmpdump
                         // if (fread(buffer, 1, dataSize, *file) != dataSize)
                         try
                         {
-                            file.Read(buffer, (int)(pos + 11), dataSize);
+                            file.Read(buffer, (int)(pos + 11), (int)dataSize);
                         }
                         catch
                         {
@@ -914,7 +914,7 @@ namespace rtmpdump
                         }
 
                         AMFObject metaObj = new AMFObject();
-                        int nRes = AMFObject.AMF_Decode(metaObj, buffer, dataSize, false);
+                        int nRes = AMFObject.AMF_Decode(metaObj, buffer, (int)dataSize, false);
                         if (nRes < 0)
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding meta data packet", __FUNCTION__);
@@ -932,7 +932,7 @@ namespace rtmpdump
                             // if (*metaHeader) free(*metaHeader);
                             // *metaHeader = (char*)malloc(*nMetaHeaderSize);
                             // memcpy(*metaHeader, buffer, *nMetaHeaderSize);
-                            metaHeader = buffer.Take(dataSize).ToArray();
+                            metaHeader = buffer.Take((int)dataSize).ToArray();
 
                             // get duration
                             AMFObjectProperty prop;
@@ -974,7 +974,7 @@ namespace rtmpdump
         /// <param name="nInitialFrameSize">length of initialFrame [out]</param>
         /// <returns></returns>
         private RD_STATUS GetLastKeyframe(FileStream file, int nSkipKeyFrames,
-            out int dSeek, out byte[] initialFrame, out byte initialFrameType, out uint nInitialFrameSize)
+            out uint dSeek, out byte[] initialFrame, out byte initialFrameType, out uint nInitialFrameSize)
         // length of initialFrame [out]
         {
             const int bufferSize = 16;
@@ -1109,7 +1109,7 @@ namespace rtmpdump
             }
 
             dSeek = AMF.AMF_DecodeInt24(buffer.Skip(4).ToArray()); // set seek position to keyframe tmestamp
-            dSeek |= (buffer[7] << 24);
+            dSeek |= (uint)(buffer[7] << 24);
             //}
             //else // handle audio only, we can seek anywhere we'd like
             //{

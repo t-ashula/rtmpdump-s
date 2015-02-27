@@ -86,12 +86,12 @@ namespace librtmp
             {
                 // *output++ = AMF_STRING;
                 buf[output++] = (byte)AMFDataType.AMF_STRING;
-                output = AMF_EncodeInt16(buf, output, outend, (short)str.av_len);
+                output = AMF_EncodeInt16(buf, output, outend, (ushort)str.av_len);
             }
             else
             {
                 buf[output++] = (byte)AMFDataType.AMF_LONG_STRING;
-                output = AMF_EncodeInt32(buf, output, outend, str.av_len);
+                output = AMF_EncodeInt32(buf, output, outend, (uint)str.av_len);
             }
 
             memcpy(buf, output, str.av_val, str.av_len);
@@ -119,7 +119,7 @@ namespace librtmp
         }
 
         /// <summary> char *AMF_EncodeInt16(char *output, char *outend, short nVal);</summary>
-        public static int AMF_EncodeInt16(byte[] buf, int output, int outend, short nval)
+        public static int AMF_EncodeInt16(byte[] buf, int output, int outend, ushort nval)
         {
             if (output + 2 > outend)
             {
@@ -133,7 +133,7 @@ namespace librtmp
         }
 
         /// <summary>  char *AMF_EncodeInt24(char *output, char *outend, int nVal);</summary>
-        public static int AMF_EncodeInt24(byte[] buf, int output, int outend, int val)
+        public static int AMF_EncodeInt24(byte[] buf, int output, int outend, uint val)
         {
             if (output + 3 > outend)
             {
@@ -148,7 +148,7 @@ namespace librtmp
         }
 
         /// <summary> char* AMF_EncodeInt32(char* output, char* outend, int nVal); </summary>
-        public static int AMF_EncodeInt32(byte[] buf, int output, int outend, int val)
+        public static int AMF_EncodeInt32(byte[] buf, int output, int outend, uint val)
         {
             if (output + 4 > outend)
             {
@@ -186,7 +186,7 @@ namespace librtmp
                 return 0;
             }
 
-            output = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
+            output = AMF_EncodeInt16(buf, output, outend, (ushort)name.av_len);
             memcpy(buf, output, name.av_val, name.av_len);
             output += name.av_len;
 
@@ -201,7 +201,7 @@ namespace librtmp
                 return 0;
             }
 
-            output = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
+            output = AMF_EncodeInt16(buf, output, outend, (ushort)name.av_len);
 
             memcpy(buf, output, name.av_val, name.av_len);
             output += name.av_len;
@@ -217,7 +217,7 @@ namespace librtmp
                 return 0;
             }
 
-            output = AMF_EncodeInt16(buf, output, outend, (short)name.av_len);
+            output = AMF_EncodeInt16(buf, output, outend, (ushort)name.av_len);
 
             memcpy(buf, output, name.av_val, name.av_len);
             output += name.av_len;
@@ -232,7 +232,7 @@ namespace librtmp
         }
 
         /// <summary> unsigned int AMF_DecodeInt24(const char *data);</summary>
-        public static int AMF_DecodeInt24(byte[] data, int offset = 0)
+        public static uint AMF_DecodeInt24(byte[] data, int offset = 0)
         {
             throw new NotImplementedException();
         }
@@ -246,7 +246,10 @@ namespace librtmp
         /// <summary> void AMF_DecodeString(const char *data, AVal * str);</summary>
         public static void AMF_DecodeString(byte[] buf, int offset, out AVal str)
         {
-            throw new NotImplementedException();
+            var len = AMF_DecodeInt16(buf);
+            var data = new byte[len];
+            Array.Copy(buf, 2, data, 0, len);
+            str = new AVal(data);
         }
 
         // void AMF_DecodeLongString(const char *data, AVal * str);

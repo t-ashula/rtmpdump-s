@@ -36,9 +36,9 @@ namespace librtmp
         public const int RTMP_FEATURE_HTTP = 0x01;
         public const int RTMP_FEATURE_ENC = 0x02;
         public const int RTMP_FEATURE_SSL = 0x04;
-        public const int RTMP_FEATURE_MFP = 0x08;/* not yet supported */
-        public const int RTMP_FEATURE_WRITE = 0x10;	/* publish, not play */
-        public const int RTMP_FEATURE_HTTP2 = 0x20;	/* server-side rtmpt */
+        public const int RTMP_FEATURE_MFP = 0x08; /* not yet supported */
+        public const int RTMP_FEATURE_WRITE = 0x10; /* publish, not play */
+        public const int RTMP_FEATURE_HTTP2 = 0x20; /* server-side rtmpt */
 
         public const int RTMP_PROTOCOL_UNDEFINED = -1;
         public const int RTMP_PROTOCOL_RTMP = 0;
@@ -137,7 +137,7 @@ namespace librtmp
         public int m_nBufferMS { get; set; }
 
         /// <summary> int m_stream_id; </summary>
-        public int m_stream_id { get; set; }		/* returned in _result from createStream */
+        public int m_stream_id { get; set; } /* returned in _result from createStream */
 
         /// <summary> int m_mediaChannel </summary>
         public int m_mediaChannel { get; set; }
@@ -176,7 +176,7 @@ namespace librtmp
         public int m_numCalls { get; set; }
 
         /// <summary> RTMP_METHOD* m_methodCalls </summary>
-        public RTMP_METHOD[] m_methodCalls { get; set; }	/* remote method calls queue */
+        public RTMP_METHOD[] m_methodCalls { get; set; } /* remote method calls queue */
 
         /// <summary> int m_channelsAllocatedIn </summary>
         public int m_channelsAllocatedIn { get; set; }
@@ -191,22 +191,22 @@ namespace librtmp
         public RTMPPacket[] m_vecChannelsOut { get; set; }
 
         /// <summary> int* m_channelTimestamp </summary>
-        public int[] m_channelTimestamp { get; set; }	/* abs timestamp of last packet */
+        public int[] m_channelTimestamp { get; set; } /* abs timestamp of last packet */
 
         /// <summary> double m_fAudioCodecs </summary>
-        public double m_fAudioCodecs { get; set; }	/* audioCodecs for the connect packet */
+        public double m_fAudioCodecs { get; set; } /* audioCodecs for the connect packet */
 
         /// <summary> double m_fVideoCodecs </summary>
-        public double m_fVideoCodecs { get; set; }	/* videoCodecs for the connect packet */
+        public double m_fVideoCodecs { get; set; } /* videoCodecs for the connect packet */
 
         /// <summary> double m_fEncoding </summary>
-        public double m_fEncoding { get; set; }	/* AMF0 or AMF3 */
+        public double m_fEncoding { get; set; } /* AMF0 or AMF3 */
 
         /// <summary> double m_fDuration </summary>
-        public double m_fDuration { get; set; }		/* duration of stream in seconds */
+        public double m_fDuration { get; set; } /* duration of stream in seconds */
 
         /// <summary> int m_msgCounter </summary>
-        public int m_msgCounter { get; set; }	/* RTMPT stuff */
+        public int m_msgCounter { get; set; } /* RTMPT stuff */
 
         /// <summary> int m_polling </summary>
         public int m_polling { get; set; }
@@ -968,7 +968,7 @@ namespace librtmp
             {
                 packet.TimeStamp = AMF.AMF_DecodeInt24(hbuf, header);
 
-                /*RTMP_Log(RTMP_LOGDEBUG, "{0}, reading RTMP packet chunk on channel %x, headersz %i, timestamp %i, abs timestamp %i", __FUNCTION__, packet.ChannelNum, nSize, packet.TimeStamp, packet.m_hasAbsTimestamp); */
+                /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, reading RTMP packet chunk on channel %x, headersz %i, timestamp %i, abs timestamp %i", __FUNCTION__, packet.ChannelNum, nSize, packet.TimeStamp, packet.HasAbsTimestamp); */
 
                 if (nSize >= 6)
                 {
@@ -1056,29 +1056,28 @@ namespace librtmp
             //memcpy(r.m_vecChannelsIn[packet.ChannelNum], packet, sizeof (RTMPPacket));
             if (r.m_vecChannelsIn[packet.ChannelNum] == null)
             {
-                r.m_vecChannelsIn[packet.ChannelNum] = new RTMPPacket
-                {
-                    Body = (byte[])packet.Body.Clone(), // TODO:
-                    BodySize = packet.BodySize,
-                    BytesRead = packet.BytesRead,
-                    ChannelNum = packet.ChannelNum,
-                    HasAbsTimestamp = packet.HasAbsTimestamp,
-                    HeaderType = packet.HeaderType,
-                    InfoField2 = packet.InfoField2,
-                    PacketType = packet.PacketType,
-                    TimeStamp = packet.TimeStamp
-                };
-                if (packet.Chunk != null)
-                {
-                    r.m_vecChannelsIn[packet.ChannelNum].Chunk = new RTMPChunk
-                    {
-                        c_header = packet.Chunk.c_header,
-                        c_chunk = (byte[])packet.Chunk.c_chunk.Clone(), // TODO:
-                        c_chunkSize = packet.Chunk.c_chunkSize,
-                        c_headerSize = packet.Chunk.c_headerSize
-                    };
-                }
+                r.m_vecChannelsIn[packet.ChannelNum] = new RTMPPacket();
             }
+
+            // TODO:
+            r.m_vecChannelsIn[packet.ChannelNum].Body = (byte[])packet.Body.Clone();
+            r.m_vecChannelsIn[packet.ChannelNum].BodySize = packet.BodySize;
+            r.m_vecChannelsIn[packet.ChannelNum].BytesRead = packet.BytesRead;
+            r.m_vecChannelsIn[packet.ChannelNum].ChannelNum = packet.ChannelNum;
+            r.m_vecChannelsIn[packet.ChannelNum].HasAbsTimestamp = packet.HasAbsTimestamp;
+            r.m_vecChannelsIn[packet.ChannelNum].HeaderType = packet.HeaderType;
+            r.m_vecChannelsIn[packet.ChannelNum].InfoField2 = packet.InfoField2;
+            r.m_vecChannelsIn[packet.ChannelNum].PacketType = packet.PacketType;
+            r.m_vecChannelsIn[packet.ChannelNum].TimeStamp = packet.TimeStamp;
+            r.m_vecChannelsIn[packet.ChannelNum].Chunk = packet.Chunk == null
+                ? null
+                : new RTMPChunk
+                {
+                    c_header = packet.Chunk.c_header,
+                    c_chunk = (byte[])packet.Chunk.c_chunk.Clone(), // TODO:
+                    c_chunkSize = packet.Chunk.c_chunkSize,
+                    c_headerSize = packet.Chunk.c_headerSize
+                };
 
             if (extendedTimestamp)
             {
@@ -1389,8 +1388,27 @@ namespace librtmp
                 r.m_vecChannelsOut[packet.ChannelNum] = new RTMPPacket();
             }
 
-            // AMF.memcpy(r.m_vecChannelsOut[packet.ChanelNum], packet, sizeof(RTMPPacket));
-            r.m_vecChannelsOut[packet.ChannelNum] = packet;
+            // TODO:
+            // memcpy(r.m_vecChannelsOut[packet.ChanelNum], packet, sizeof(RTMPPacket));
+            r.m_vecChannelsOut[packet.ChannelNum].BodySize = packet.BodySize;
+            r.m_vecChannelsOut[packet.ChannelNum].BytesRead = packet.BytesRead;
+            r.m_vecChannelsOut[packet.ChannelNum].ChannelNum = packet.ChannelNum;
+            r.m_vecChannelsOut[packet.ChannelNum].Chunk = packet.Chunk == null
+                ? null
+                : new RTMPChunk
+                {
+                    c_chunk = packet.Chunk.c_chunk,
+                    c_chunkSize = packet.Chunk.c_chunkSize,
+                    c_header = packet.Chunk.c_header,
+                    c_headerSize = packet.Chunk.c_headerSize
+                };
+            r.m_vecChannelsOut[packet.ChannelNum].HasAbsTimestamp = packet.HasAbsTimestamp;
+            r.m_vecChannelsOut[packet.ChannelNum].HeaderType = packet.HeaderType;
+            r.m_vecChannelsOut[packet.ChannelNum].InfoField2 = packet.InfoField2;
+            r.m_vecChannelsOut[packet.ChannelNum].PacketType = packet.PacketType;
+            r.m_vecChannelsOut[packet.ChannelNum].TimeStamp = packet.TimeStamp;
+            r.m_vecChannelsOut[packet.ChannelNum].Body = (byte[])packet.Body.Clone();
+
             return true;
         }
 
@@ -1475,10 +1493,180 @@ namespace librtmp
 
         // void RTMP_DeleteStream(RTMP *r);
         // int RTMP_GetNextMediaPacket(RTMP *r, RTMPPacket *packet);
+
         /// <summary> int RTMP_ClientPacket(RTMP *r, RTMPPacket *packet);</summary>
-        public static int RTMP_ClientPacket(RTMP r, RTMPPacket p)
+        public static int RTMP_ClientPacket(RTMP r, RTMPPacket packet)
         {
-            throw new NotImplementedException();
+            const string __FUNCTION__ = "RTMP_ClientPacket";
+            {
+                int bHasMediaPacket = 0;
+                switch (packet.PacketType)
+                {
+                    case RTMP_PACKET_TYPE_CHUNK_SIZE:
+                        /* chunk size */
+                        HandleChangeChunkSize(r, packet);
+                        break;
+
+                    case RTMP_PACKET_TYPE_BYTES_READ_REPORT:
+                        /* bytes read report */
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: bytes read report", __FUNCTION__);
+                        break;
+
+                    case RTMP_PACKET_TYPE_CONTROL:
+                        /* ctrl */
+                        HandleCtrl(r, packet);
+                        break;
+
+                    case RTMP_PACKET_TYPE_SERVER_BW:
+                        /* server bw */
+                        HandleServerBW(r, packet);
+                        break;
+
+                    case RTMP_PACKET_TYPE_CLIENT_BW:
+                        /* client bw */
+                        HandleClientBW(r, packet);
+                        break;
+
+                    case RTMP_PACKET_TYPE_AUDIO:
+                        /* audio data */
+                        /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: audio %lu bytes", __FUNCTION__, packet.BodySize); */
+                        HandleAudio(r, packet);
+                        bHasMediaPacket = 1;
+                        if (r.m_mediaChannel != 0)
+                            r.m_mediaChannel = packet.ChannelNum;
+                        if (r.m_pausing != 0)
+                            r.m_mediaStamp = packet.TimeStamp;
+                        break;
+
+                    case RTMP_PACKET_TYPE_VIDEO:
+                        /* video data */
+                        /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: video %lu bytes", __FUNCTION__, packet.BodySize); */
+                        HandleVideo(r, packet);
+                        bHasMediaPacket = 1;
+                        if (r.m_mediaChannel != 0)
+                            r.m_mediaChannel = packet.ChannelNum;
+                        if (r.m_pausing != 0)
+                            r.m_mediaStamp = packet.TimeStamp;
+                        break;
+
+                    case RTMP_PACKET_TYPE_FLEX_STREAM_SEND:
+                        /* flex stream send */
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                            "{0}, flex stream send, size %u bytes, not supported, ignoring",
+                            __FUNCTION__, packet.BodySize);
+                        break;
+
+                    case RTMP_PACKET_TYPE_FLEX_SHARED_OBJECT:
+                        /* flex shared object */
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                            "{0}, flex shared object, size {1} bytes, not supported, ignoring",
+                            __FUNCTION__, packet.BodySize);
+                        break;
+
+                    case RTMP_PACKET_TYPE_FLEX_MESSAGE:
+                        /* flex message */
+                        {
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                                "{0}, flex message, size {1} bytes, not fully supported",
+                                __FUNCTION__, packet.BodySize);
+                            /*RTMP_LogHex(packet.Body, packet.BodySize); */
+
+                            /* some DEBUG code */
+#if UNUSE
+        RTMP_LIB_AMFObject obj;
+        int nRes = obj.Decode(packet.Body + 1, packet.BodySize - 1);
+        if (nRes < 0) {
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding AMF3 packet", __FUNCTION__);
+            /*return; */
+        }
+
+        obj.Dump();
+#endif
+
+                            if (HandleInvoke(r, packet.Body, 1, packet.BodySize - 1) == 1)
+                            {
+                                bHasMediaPacket = 2;
+                            }
+
+                            break;
+                        }
+                    case RTMP_PACKET_TYPE_INFO:
+                        /* metadata (notify) */
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: notify {1} bytes", __FUNCTION__,
+                            packet.BodySize);
+                        if (HandleMetadata(r, packet.Body, 0, packet.BodySize))
+                        {
+                            bHasMediaPacket = 1;
+                        }
+                        break;
+
+                    case RTMP_PACKET_TYPE_SHARED_OBJECT:
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, shared object, not supported, ignoring",
+                            __FUNCTION__);
+                        break;
+
+                    case RTMP_PACKET_TYPE_INVOKE:
+                        /* invoke */
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: invoke {1} bytes", __FUNCTION__,
+                            packet.BodySize);
+                        /*RTMP_LogHex(packet.Body, packet.BodySize); */
+
+                        if (HandleInvoke(r, packet.Body, 0, packet.BodySize) == 1)
+                        {
+                            bHasMediaPacket = 2;
+                        }
+                        break;
+
+                    case RTMP_PACKET_TYPE_FLASH_VIDEO:
+                        {
+                            /* go through FLV packets and handle metadata packets */
+                            int pos = 0;
+                            var nTimeStamp = packet.TimeStamp;
+
+                            while (pos + 11 < packet.BodySize)
+                            {
+                                var dataSize = AMF.AMF_DecodeInt24(packet.Body, pos + 1); /* size without header (11) and prevTagSize (4) */
+
+                                if (pos + 11 + dataSize + 4 > packet.BodySize)
+                                {
+                                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "Stream corrupt?!");
+                                    break;
+                                }
+                                if (packet.Body[pos] == 0x12)
+                                {
+                                    HandleMetadata(r, packet.Body, pos + 11, dataSize);
+                                }
+                                else if (packet.Body[pos] == 8 || packet.Body[pos] == 9)
+                                {
+                                    nTimeStamp = AMF.AMF_DecodeInt24(packet.Body, pos + 4);
+                                    nTimeStamp |= (uint)(packet.Body[pos + 7] << 24); // TODO:
+                                }
+
+                                pos += (int)(11 + dataSize + 4); // TODO:
+                            }
+
+                            if (r.m_pausing != 0)
+                            {
+                                r.m_mediaStamp = nTimeStamp;
+                            }
+
+                            /* FLV tag(s) */
+                            /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: FLV tag(s) %lu bytes", __FUNCTION__, packet.BodySize); */
+                            bHasMediaPacket = 1;
+                        }
+                        break;
+
+                    default:
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, unknown packet type received: 0x{1:x02}", __FUNCTION__,
+                            packet.PacketType);
+#if  _DEBUG
+                        Log.RTMP_LogHex(Log.RTMP_LogLevel.RTMP_LOGDEBUG, packet.Body, packet.BodySize);
+#endif
+                        break;
+                }
+
+                return bHasMediaPacket;
+            }
         }
 
 #if CRYPTO
@@ -1533,8 +1721,38 @@ namespace librtmp
         }
 
         /* caller probably doesn't know current timestamp, should just use RTMP_Pause instead */
-        // int RTMP_SendPause(RTMP *r, int DoPause, int dTime);
-        // int RTMP_Pause(RTMP *r, int DoPause);
+
+        /// <summary> int RTMP_SendPause(RTMP *r, int doPause, int iTime)</summary>
+        public static bool RTMP_SendPause(RTMP r, bool doPause, int iTime)
+        {
+            const string __FUNCTION__ = "RTMP_SendPause";
+            RTMPPacket packet = new RTMPPacket();
+            var pbuf = new byte[256];
+            var pend = pbuf.Length;
+            var enc = 0;
+
+            packet.ChannelNum = 0x08; /* video channel */
+            packet.HeaderType = RTMP_PACKET_SIZE_MEDIUM;
+            packet.PacketType = RTMP_PACKET_TYPE_INVOKE;
+            packet.TimeStamp = 0;
+            packet.InfoField2 = 0;
+            packet.HasAbsTimestamp = false;
+            packet.Body = pbuf;
+            ;
+
+            enc = RTMP_MAX_HEADER_SIZE;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_pause);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeBoolean(pbuf, enc, pend, doPause);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, iTime);
+
+            packet.BodySize = (uint)enc; // - packet.Body;
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, {1}, pauseTime={2}", __FUNCTION__, doPause, iTime);
+            return RTMP_SendPacket(r, packet, true);
+        }
+
+        // int RTMP_Pause(RTMP *r, int doPause);
 
         /// <summary> int RTMP_FindFirstMatchingProperty(AMFObject *obj, const AVal *name,AMFObjectProperty * p); </summary>
         public static bool RTMP_FindFirstMatchingProperty(AMFObject obj, AVal name, out AMFObjectProperty p)
@@ -1542,13 +1760,66 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        // int RTMPSockBuf_Fill(RTMPSockBuf *sb);
-        // int RTMPSockBuf_Send(RTMPSockBuf *sb, const char *buf, int len);
-        // int RTMPSockBuf_Close(RTMPSockBuf *sb);
+        /// <summary>
+        /// int RTMP_FindPrefixProperty(AMFObject *obj, const AVal *name, AMFObjectProperty * p)
+        /// /* Like above, but only check if name is a prefix of property */
+        /// </summary>
+        public static bool RTMP_FindPrefixProperty(AMFObject obj, AVal name, out AMFObjectProperty p)
+        {
+            throw new NotImplementedException();
+        }
 
-        // int RTMP_SendCreateStream(RTMP *r);
+        /// <summary> int RTMP_SendCreateStream(RTMP *r)</summary>
+        public static bool RTMP_SendCreateStream(RTMP r)
+        {
+            RTMPPacket packet = new RTMPPacket();
+            var pbuf = new byte[256];
+            var pend = pbuf.Length;
+            var enc = 0;
+
+            packet.ChannelNum = 0x03; /* control channel (invoke) */
+            packet.HeaderType = RTMP_PACKET_SIZE_MEDIUM;
+            packet.PacketType = RTMP_PACKET_TYPE_INVOKE;
+            packet.TimeStamp = 0;
+            packet.InfoField2 = 0;
+            packet.HasAbsTimestamp = false;
+            packet.Body = pbuf;
+            ;
+
+            enc = RTMP_MAX_HEADER_SIZE;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_createStream);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL; /* NULL */
+
+            packet.BodySize = (uint)enc; // - packet.Body;
+
+            return RTMP_SendPacket(r, packet, true);
+        }
+
         // int RTMP_SendSeek(RTMP *r, int dTime);
-        // int RTMP_SendServerBW(RTMP *r);
+
+        /// <summary> int RTMP_SendServerBW(RTMP *r);</summary>
+        public static bool RTMP_SendServerBW(RTMP r)
+        {
+            RTMPPacket packet = new RTMPPacket();
+            byte[] pbuf = new byte[256];
+            var pend = pbuf.Length;
+
+            packet.ChannelNum = 0x02; /* control channel (invoke) */
+            packet.HeaderType = RTMP_PACKET_SIZE_LARGE;
+            packet.PacketType = RTMP_PACKET_TYPE_SERVER_BW;
+            packet.TimeStamp = 0;
+            packet.InfoField2 = 0;
+            packet.HasAbsTimestamp = false;
+            packet.Body = pbuf;
+            ;
+
+            packet.BodySize = 4;
+
+            AMF.AMF_EncodeInt32(packet.Body, 0, pend, (uint)r.m_nServerBW); //
+            return RTMP_SendPacket(r, packet, false);
+        }
+
         // int RTMP_SendClientBW(RTMP *r);
         // void RTMP_DropRequest(RTMP *r, int i, int freeit);
 
@@ -1743,7 +2014,7 @@ namespace librtmp
             return true;
         }
 
-        // static int SHandShake(RTMP *r)
+        /// <summary> static int SHandShake(RTMP *r) </summary>
         private static bool SHandShake(RTMP r)
         {
             const string __FUNCTION__ = "SHandShake";
@@ -1833,23 +2104,76 @@ namespace librtmp
 #endif
 
         private static readonly AVal av_app = AVal.AVC("app");
-        private readonly static AVal av_connect = AVal.AVC("connect");
-        private readonly static AVal av_flashVer = AVal.AVC("flashVer");
-        private readonly static AVal av_swfUrl = AVal.AVC("swfUrl)");
-        private readonly static AVal av_pageUrl = AVal.AVC("pageUrl");
-        private readonly static AVal av_tcUrl = AVal.AVC("tcUrl");
-        private readonly static AVal av_fpad = AVal.AVC("fpad");
-        private readonly static AVal av_capabilities = AVal.AVC("capabilities");
-        private readonly static AVal av_audioCodecs = AVal.AVC("audioCodecs");
-        private readonly static AVal av_videoCodecs = AVal.AVC("videoCodecs");
-        private readonly static AVal av_videoFunction = AVal.AVC("videoFunction");
-        private readonly static AVal av_objectEncoding = AVal.AVC("objectEncoding");
-        private readonly static AVal av_secureToken = AVal.AVC("secureToken");
-        private readonly static AVal av_secureTokenResponse = AVal.AVC("secureTokenResponse");
-        private readonly static AVal av_type = AVal.AVC("type");
-        private readonly static AVal av_nonprivate = AVal.AVC("nonprivate");
+        private static readonly AVal av_connect = AVal.AVC("connect");
+        private static readonly AVal av_flashVer = AVal.AVC("flashVer");
+        private static readonly AVal av_swfUrl = AVal.AVC("swfUrl)");
+        private static readonly AVal av_pageUrl = AVal.AVC("pageUrl");
+        private static readonly AVal av_tcUrl = AVal.AVC("tcUrl");
+        private static readonly AVal av_fpad = AVal.AVC("fpad");
+        private static readonly AVal av_capabilities = AVal.AVC("capabilities");
+        private static readonly AVal av_audioCodecs = AVal.AVC("audioCodecs");
+        private static readonly AVal av_videoCodecs = AVal.AVC("videoCodecs");
+        private static readonly AVal av_videoFunction = AVal.AVC("videoFunction");
+        private static readonly AVal av_objectEncoding = AVal.AVC("objectEncoding");
+        private static readonly AVal av_secureToken = AVal.AVC("secureToken");
+        private static readonly AVal av_secureTokenResponse = AVal.AVC("secureTokenResponse");
+        private static readonly AVal av_type = AVal.AVC("type");
+        private static readonly AVal av_nonprivate = AVal.AVC("nonprivate");
+        private static readonly AVal av_FCUnpublish = AVal.AVC("FCUnpublish");
+        private static readonly AVal av_deleteStream = AVal.AVC("deleteStream");
+        private static readonly AVal av__result = AVal.AVC("_result");
+        private static readonly AVal av_createStream = AVal.AVC("createStream");
+        private static readonly AVal av_releaseStream = AVal.AVC("releaseStream");
+        private static readonly AVal av_play = AVal.AVC("play");
+        private static readonly AVal av_live = AVal.AVC("live");
+        private static readonly AVal av_pause = AVal.AVC("pause");
 
-        // static int SendConnectPacket(RTMP *r, RTMPPacket* cp);
+        private static readonly AVal av_0 = AVal.AVC("0");
+        private static readonly AVal av_publish = AVal.AVC("publish");
+        private static readonly AVal av_onBWDone = AVal.AVC("onBWDone");
+        private static readonly AVal av_onFCSubscribe = AVal.AVC("onFCSubscribe");
+        private static readonly AVal av_onFCUnsubscribe = AVal.AVC("onFCUnsubscribe");
+
+        private static readonly AVal av_FCPublish = AVal.AVC("FCPublish");
+        private static readonly AVal av_FCSubscribe = AVal.AVC("FCSubscribe");
+
+        private static readonly AVal av_ping = AVal.AVC("ping");
+        private static readonly AVal av_pong = AVal.AVC("pong");
+        private static readonly AVal av__onbwcheck = AVal.AVC("_onbwcheck");
+        private static readonly AVal av__onbwdone = AVal.AVC("_onbwdone");
+        private static readonly AVal av__error = AVal.AVC("_error");
+        private static readonly AVal av_close = AVal.AVC("close");
+        private static readonly AVal av_onStatus = AVal.AVC("onStatus");
+        private static readonly AVal av_code = AVal.AVC("code");
+        private static readonly AVal av_level = AVal.AVC("level");
+        private static readonly AVal av_set_playlist = AVal.AVC("set_playlist");
+
+        private static readonly AVal av_description = AVal.AVC("description");
+        private static readonly AVal av_playlist_ready = AVal.AVC("playlist_ready");
+        private static readonly AVal av_NetStream_Failed = AVal.AVC("NetStream.Failed");
+        private static readonly AVal av_NetStream_Play_Failed = AVal.AVC("NetStream.Play.Failed");
+        private static readonly AVal av_NetStream_Play_StreamNotFound = AVal.AVC("NetStream.Play.StreamNotFound");
+        private static readonly AVal av_NetConnection_Connect_InvalidApp = AVal.AVC("NetConnection.Connect.InvalidApp");
+        private static readonly AVal av_NetStream_Play_Start = AVal.AVC("NetStream.Play.Start");
+        private static readonly AVal av_NetStream_Play_Complete = AVal.AVC("NetStream.Play.Complete");
+        private static readonly AVal av_NetStream_Play_Stop = AVal.AVC("NetStream.Play.Stop");
+        private static readonly AVal av_NetStream_Seek_Notify = AVal.AVC("NetStream.Seek.Notify");
+        private static readonly AVal av_NetStream_Pause_Notify = AVal.AVC("NetStream.Pause.Notify");
+        private static readonly AVal av_NetStream_Play_PublishNotify = AVal.AVC("NetStream.Play.PublishNotify");
+        private static readonly AVal av_NetStream_Play_UnpublishNotify = AVal.AVC("NetStream.Play.UnpublishNotify");
+        private static readonly AVal av_NetStream_Publish_Start = AVal.AVC("NetStream.Publish.Start");
+        private static readonly AVal av_NetConnection_Connect_Rejected = AVal.AVC("NetConnection.Connect.Rejected");
+
+        /* Justin.tv specific authentication */
+        private static readonly AVal av_NetStream_Authenticate_UsherToken = AVal.AVC("NetStream.Authenticate.UsherToken");
+
+        private static readonly AVal av_onMetaData = AVal.AVC("onMetaData");
+        private static readonly AVal av_duration = AVal.AVC("duration");
+        private static readonly AVal av_video = AVal.AVC("video");
+        private static readonly AVal av_audio = AVal.AVC("audio");
+        private static readonly AVal av__checkbw = AVal.AVC("_checkbw");
+
+        /// <summary> static int SendConnectPacket(RTMP *r, RTMPPacket* cp);</summary>
         private static bool SendConnectPacket(RTMP r, RTMPPacket cp)
         {
             const string __FUNCTION__ = "SendConnectPacket";
@@ -2013,7 +2337,7 @@ namespace librtmp
             return RTMP_SendPacket(r, packet, true);
         }
 
-        // static int WriteN(RTMP *r, const char *buffer, int n)
+        /// <summary> static int WriteN(RTMP *r, const char *buffer, int n)</summary>
         private static bool WriteN(RTMP r, byte[] buffer, int n)
         {
             const string __FUNCTION__ = "WriteN";
@@ -2074,7 +2398,7 @@ namespace librtmp
             return n == 0;
         }
 
-        // static int ReadN(RTMP *r, char* buffer, int n)
+        /// <summary> static int ReadN(RTMP *r, char* buffer, int n)</summary>
         private static int ReadN(RTMP r, byte[] buffer, int n)
         {
             const string __FUNCTION__ = "ReadN";
@@ -2179,7 +2503,7 @@ namespace librtmp
                         }
                     }
                 }
-                /*RTMP_Log(RTMP_LOGDEBUG, "%s: %d bytes\n", __FUNCTION__, nBytes); */
+                /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "%s: %d bytes\n", __FUNCTION__, nBytes); */
 #if _DEBUG
                 fwrite(ptr, 1, nBytes, netstackdump_read);
 #endif
@@ -2211,10 +2535,10 @@ namespace librtmp
             return nOriginalSize - n;
         }
 
-        // static int SendBytesReceived(RTMP *r)
+        /// <summary> static int SendBytesReceived(RTMP *r)</summary>
         private static bool SendBytesReceived(RTMP r)
         {
-            RTMPPacket packet = new RTMPPacket
+            var packet = new RTMPPacket
             {
                 ChannelNum = 0x02,
                 HeaderType = RTMP_PACKET_SIZE_MEDIUM,
@@ -2227,22 +2551,15 @@ namespace librtmp
             };
 
             /* control channel (invoke) */
-            var buf = new byte[256];
-            var pbuf = 0;
-            var pend = 256;
-            AMF.AMF_EncodeInt32(buf, pbuf, pend, (uint)r.m_nBytesIn); /* hard coded for now */
-            for (var i = 0; i < 256 - RTMP_MAX_HEADER_SIZE; ++i)
-            {
-                packet.Body[i + RTMP_MAX_HEADER_SIZE] = buf[i];
-            }
-
+            var pend = packet.Body.Length;
+            AMF.AMF_EncodeInt32(packet.Body, 0, pend, (uint)r.m_nBytesIn); /* hard coded for now */
             r.m_nBytesInSent = r.m_nBytesIn;
 
-            /*RTMP_Log(RTMP_LOGDEBUG, "Send bytes report. 0x%x (%d bytes)", (unsigned int)m_nBytesIn, m_nBytesIn); */
+            /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Send bytes report. 0x%x (%d bytes)", (unsigned int)m_nBytesIn, m_nBytesIn); */
             return RTMP_SendPacket(r, packet, false);
         }
 
-        // static void AV_queue(RTMP_METHOD** vals, int* num, AVal* av, int txn)
+        /// <summary> static void AV_queue(RTMP_METHOD** vals, int* num, AVal* av, int txn)</summary>
         private static void AV_queue(RTMP_METHOD[] vals, ref int num, AVal av, int txn)
         {
             // char* tmp;
@@ -2277,14 +2594,33 @@ namespace librtmp
             num += 1;
         }
 
-        // static void AV_clear(RTMP_METHOD* vals, int num)
+        /// <summary> static void AV_clear(RTMP_METHOD* vals, int num)</summary>
         private static void AV_clear(RTMP_METHOD[] vals, int num)
         {
             // for (var i = 0; i < num; i++) free(vals[i].name.av_val);
             // free(vals);
         }
 
-        // static void CloseInternal(RTMP *r, int reconnect)
+        /// <summary> static void AV_erase(RTMP_METHOD *vals, int *num, int i, int freeit)</summary>
+        private static void AV_erase(RTMP_METHOD[] vals, ref int num, int i, bool freeit)
+        {
+            if (freeit)
+            {
+                vals[i].name.av_val = null; // free(vals[i].name.av_val);
+            }
+
+            num--;
+            for (; i < num; i++)
+            {
+                vals[i] = vals[i + 1];
+            }
+
+            vals[i].name.av_val = null;
+            vals[i].name.av_len = 0;
+            vals[i].num = 0;
+        }
+
+        /// <summary> static void CloseInternal(RTMP *r, int reconnect)</summary>
         private static void CloseInternal(RTMP r, bool reconnect)
         {
             if (RTMP_IsConnected(r))
@@ -2407,17 +2743,12 @@ namespace librtmp
 #endif
         }
 
-        private static readonly AVal av_FCUnpublish = AVal.AVC("FCUnpublish");
-
-        // static int SendFCUnpublish(RTMP *r)
+        /// <summary> static int SendFCUnpublish(RTMP *r)</summary>
         private static bool SendFCUnpublish(RTMP r)
         {
-            // char pbuf [1024],*pend = pbuf + sizeof (pbuf);
             var pbuf = new Byte[1024];
             int pend = pbuf.Length;
-            // char* enc;
-
-            var enc = RTMP_MAX_HEADER_SIZE;
+            var enc = 0; // char* enc;
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_FCUnpublish);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
             pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
@@ -2429,49 +2760,1065 @@ namespace librtmp
 
             var packet = new RTMPPacket
             {
-                ChannelNum = 0x03,
+                ChannelNum = 0x03, /* control channel (invoke) */
                 HeaderType = RTMP_PACKET_SIZE_MEDIUM,
                 PacketType = RTMP_PACKET_TYPE_INVOKE,
                 TimeStamp = 0,
                 InfoField2 = 0,
                 HasAbsTimestamp = false,
                 Body = pbuf,
-                BodySize = (uint)(enc - RTMP_MAX_HEADER_SIZE)
+                BodySize = (uint)enc
             };
-            /* control channel (invoke) */
-            // - packet.m_body;
+
+            // - packet.Body;
 
             return RTMP_SendPacket(r, packet, false);
         }
 
-        private static readonly AVal av_deleteStream = AVal.AVC("deleteStream");
-
-        // static int SendDeleteStream(RTMP *r, double dStreamId)
+        /// <summary> static int SendDeleteStream(RTMP *r, double dStreamId)</summary>
         private static bool SendDeleteStream(RTMP r, double streamId)
         {
             var pbuf = new byte[256];
             var pend = pbuf.Length;
-            int enc = RTMP_MAX_HEADER_SIZE; // packet.m_body;
+            var enc = 0; // packet.Body;
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_deleteStream);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
             pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, streamId);
 
-            RTMPPacket packet = new RTMPPacket
+            var packet = new RTMPPacket
             {
-                ChannelNum = 0x03,
+                ChannelNum = 0x03, /* control channel (invoke) */
                 HeaderType = RTMP_PACKET_SIZE_MEDIUM,
                 PacketType = RTMP_PACKET_TYPE_INVOKE,
                 TimeStamp = 0,
                 InfoField2 = 0,
                 HasAbsTimestamp = false,
                 Body = pbuf,
-                BodySize = (uint)(enc - RTMP_MAX_HEADER_SIZE)
+                BodySize = (uint)enc
             };
-            /* control channel (invoke) */
 
             /* no response expected */
             return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary>
+        /// static int HandleInvoke(RTMP *r, const char *body, unsigned int nBodySize)
+        /// /* Returns 0 for OK/Failed/error, 1 for 'Stop or Complete' */
+        /// </summary>
+        private static int HandleInvoke(RTMP r, byte[] body, int offset, uint nBodySize)
+        {
+            const string __FUNCTION__ = "HandleInvoke";
+            if (body[0] != 0x02) /* make sure it is a string method name we start with */
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "{0}, Sanity failed. no string method in invoke packet",
+                    __FUNCTION__);
+                return 0;
+            }
+
+            AMFObject obj = new AMFObject();
+            int ret = 0;
+            var nRes = AMFObject.AMF_Decode(obj, body, (int)nBodySize, false);
+            if (nRes < 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding invoke packet", __FUNCTION__);
+                return 0;
+            }
+
+            AMFObject.AMF_Dump(obj);
+            AVal method;
+            AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(obj, null, 0), out method);
+            var txn = AMFObjectProperty.AMFProp_GetNumber(AMFObject.AMF_GetProp(obj, null, 1));
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, server invoking <{1}>", __FUNCTION__, method.av_val);
+
+            if (AVal.Match(method, av__result))
+            {
+                AVal methodInvoked = null; // = { 0 };
+                int i;
+
+                for (i = 0; i < r.m_numCalls; i++)
+                {
+                    if (r.m_methodCalls[i].num == (int)txn)
+                    {
+                        methodInvoked = r.m_methodCalls[i].name;
+                        var n = r.m_numCalls;
+                        AV_erase(r.m_methodCalls, ref n, i, false);
+                        r.m_numCalls = n;
+                        break;
+                    }
+                }
+
+                if (methodInvoked == null)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received result id {1} without matching request", __FUNCTION__, txn);
+                    goto leave;
+                }
+
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received result for method call <{1}>", __FUNCTION__, methodInvoked.to_s());
+
+                if (AVal.Match(methodInvoked, av_connect))
+                {
+                    if (r.Link.token != null && r.Link.token.av_len != 0)
+                    {
+                        AMFObjectProperty p;
+                        if (RTMP_FindFirstMatchingProperty(obj, av_secureToken, out p))
+                        {
+                            DecodeTEA(r.Link.token, p.p_aval);
+                            SendSecureTokenResponse(r, p.p_aval);
+                        }
+                    }
+
+                    if ((r.Link.protocol & RTMP_FEATURE_WRITE) != 0x00)
+                    {
+                        SendReleaseStream(r);
+                        SendFCPublish(r);
+                    }
+                    else
+                    {
+                        RTMP_SendServerBW(r);
+                        RTMP_SendCtrl(r, 3, 0, 300);
+                    }
+
+                    RTMP_SendCreateStream(r);
+
+                    if ((r.Link.protocol & RTMP_FEATURE_WRITE) == 0x00)
+                    {
+                        /* Authenticate on Justin.tv legacy servers before sending FCSubscribe */
+                        if (r.Link.usherToken != null && r.Link.usherToken.av_len != 0)
+                        {
+                            SendUsherToken(r, r.Link.usherToken);
+                        }
+
+                        /* Send the FCSubscribe if live stream or if subscribepath is set */
+                        if (r.Link.subscribepath != null && r.Link.subscribepath.av_len != 0)
+                        {
+                            SendFCSubscribe(r, r.Link.subscribepath);
+                        }
+                        else if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_LIVE) != 0x00)
+                        {
+                            SendFCSubscribe(r, r.Link.playpath);
+                        }
+                    }
+                }
+                else if (AVal.Match(methodInvoked, av_createStream))
+                {
+                    r.m_stream_id = (int)AMFObjectProperty.AMFProp_GetNumber(AMFObject.AMF_GetProp(obj, null, 3));
+
+                    if ((r.Link.protocol & RTMP_FEATURE_WRITE) != 0x00)
+                    {
+                        SendPublish(r);
+                    }
+                    else
+                    {
+                        if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_PLST) != 0x00)
+                        {
+                            SendPlaylist(r);
+                        }
+
+                        SendPlay(r);
+                        RTMP_SendCtrl(r, 3, (uint)r.m_stream_id, (uint)r.m_nBufferMS);
+                    }
+                }
+                else if (AVal.Match(methodInvoked, av_play)
+                         || AVal.Match(methodInvoked, av_publish))
+                {
+                    r.m_bPlaying = true;
+                }
+
+                // free(methodInvoked.av_val);
+                methodInvoked.av_val = null;
+            }
+            else if (AVal.Match(method, av_onBWDone))
+            {
+                if (r.m_nBWCheckCounter != 0)
+                {
+                    SendCheckBW(r);
+                }
+            }
+            else if (AVal.Match(method, av_onFCSubscribe))
+            {
+                /* SendOnFCSubscribe(); */
+            }
+            else if (AVal.Match(method, av_onFCUnsubscribe))
+            {
+                RTMP_Close(r);
+                ret = 1;
+            }
+            else if (AVal.Match(method, av_ping))
+            {
+                SendPong(r, txn);
+            }
+            else if (AVal.Match(method, av__onbwcheck))
+            {
+                SendCheckBWResult(r, txn);
+            }
+            else if (AVal.Match(method, av__onbwdone))
+            {
+                for (var i = 0; i < r.m_numCalls; i++)
+                {
+                    if (AVal.Match(r.m_methodCalls[i].name, av__checkbw))
+                    {
+                        var n = r.m_numCalls;
+                        AV_erase(r.m_methodCalls, ref n, i, true);
+                        r.m_numCalls = n;
+                        break;
+                    }
+                }
+            }
+            else if (AVal.Match(method, av__error))
+            {
+#if CRYPTO
+                AVal methodInvoked = { 0 };
+                int i;
+
+                if (r.Link.protocol & RTMP_FEATURE_WRITE)
+                {
+                    for (i = 0; i < r.m_numCalls; i++)
+                    {
+                        if (r.m_methodCalls[i].num == txn)
+                        {
+                            methodInvoked = r.m_methodCalls[i].name;
+                            AV_erase(r.m_methodCalls, &r.m_numCalls, i, false);
+                            break;
+                        }
+                    }
+                    if (!methodInvoked.av_val)
+                    {
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received result id %f without matching request",
+                            __FUNCTION__, txn);
+                        goto leave;
+                    }
+
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received error for method call <%s>", __FUNCTION__,
+                        methodInvoked.av_val);
+
+                    if (AVal.Match(&methodInvoked, &av_connect))
+                    {
+                        AMFObject obj2;
+                        AVal code, level, description;
+                        AMFProp_GetObject(AMFObject.AMF_GetProp(obj, null, 3), obj2);
+                        AMFProp_GetString(AMFObject.AMF_GetProp(obj2, &av_code, -1), &code);
+                        AMFProp_GetString(AMFObject.AMF_GetProp(obj2, &av_level, -1), &level);
+                        AMFProp_GetString(AMFObject.AMF_GetProp(obj2, &av_description, -1), &description);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, error description: %s", __FUNCTION__, description.av_val);
+                        /* if PublisherAuth returns 1, then reconnect */
+                        if (PublisherAuth(r, &description) == 1)
+                        {
+                            CloseInternal(r, 1);
+                            if (!RTMP_Connect(r, null) || !RTMP_ConnectStream(r, 0))
+                                goto leave;
+                        }
+                    }
+                }
+                else
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "rtmp server sent error");
+                }
+                free(methodInvoked.av_val);
+#else
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "rtmp server sent error");
+#endif
+            }
+            else if (AVal.Match(method, av_close))
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "rtmp server requested close");
+                RTMP_Close(r);
+            }
+            else if (AVal.Match(method, av_onStatus))
+            {
+                AMFObject obj2;
+                AVal code, level;
+                AMFObjectProperty.AMFProp_GetObject(AMFObject.AMF_GetProp(obj, null, 3), out obj2);
+                AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(obj2, av_code, -1), out code);
+                AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(obj2, av_level, -1), out level);
+
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, onStatus: {1}", __FUNCTION__, code.to_s());
+                if (AVal.Match(code, av_NetStream_Failed)
+                    || AVal.Match(code, av_NetStream_Play_Failed)
+                    || AVal.Match(code, av_NetStream_Play_StreamNotFound)
+                    || AVal.Match(code, av_NetConnection_Connect_InvalidApp))
+                {
+                    r.m_stream_id = -1;
+                    RTMP_Close(r);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Closing connection: {0}", code.to_s());
+                }
+                else if (AVal.Match(code, av_NetStream_Play_Start)
+                         || AVal.Match(code, av_NetStream_Play_PublishNotify))
+                {
+                    r.m_bPlaying = true;
+                    for (var i = 0; i < r.m_numCalls; i++)
+                    {
+                        if (AVal.Match(r.m_methodCalls[i].name, av_play))
+                        {
+                            var n = r.m_numCalls;
+                            AV_erase(r.m_methodCalls, ref n, i, true);
+                            r.m_numCalls = n;
+                            break;
+                        }
+                    }
+                }
+                else if (AVal.Match(code, av_NetStream_Publish_Start))
+                {
+                    r.m_bPlaying = true;
+                    for (var i = 0; i < r.m_numCalls; i++)
+                    {
+                        if (AVal.Match(r.m_methodCalls[i].name, av_publish))
+                        {
+                            var n = r.m_numCalls;
+                            AV_erase(r.m_methodCalls, ref n, i, true);
+                            r.m_numCalls = n;
+                            break;
+                        }
+                    }
+                }
+
+                /* Return 1 if this is a Play.Complete or Play.Stop */
+                else if (AVal.Match(code, av_NetStream_Play_Complete)
+                         || AVal.Match(code, av_NetStream_Play_Stop)
+                         || AVal.Match(code, av_NetStream_Play_UnpublishNotify))
+                {
+                    RTMP_Close(r);
+                    ret = 1;
+                }
+                else if (AVal.Match(code, av_NetStream_Seek_Notify))
+                {
+                    r.m_read.flags &= ((~RTMP_READ.RTMP_READ_SEEKING) & 0xFF); // (~RTMP_READ.RTMP_READ_SEEKING);
+                }
+                else if (AVal.Match(code, av_NetStream_Pause_Notify))
+                {
+                    if (r.m_pausing == 1 || r.m_pausing == 2)
+                    {
+                        RTMP_SendPause(r, false, (int)r.m_pauseStamp); // TODO:
+                        r.m_pausing = 3;
+                    }
+                }
+            }
+            else if (AVal.Match(method, av_playlist_ready))
+            {
+                for (var i = 0; i < r.m_numCalls; i++)
+                {
+                    if (AVal.Match(r.m_methodCalls[i].name, av_set_playlist))
+                    {
+                        var n = r.m_numCalls;
+                        AV_erase(r.m_methodCalls, ref n, i, true);
+                        r.m_numCalls = n;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+            }
+        leave:
+            AMFObject.AMF_Reset(obj);
+            return ret;
+        }
+
+        /// <summary> static int HandleMetadata(RTMP *r, char *body, unsigned int len)</summary>
+        private static bool HandleMetadata(RTMP r, byte[] body, int offset, uint len)
+        {
+            const string __FUNCTION__ = "HandleMetadata";
+            /* allright we get some info here, so parse it and print it */
+            /* also keep duration or filesize to make a nice progress bar */
+
+            AMFObject obj = new AMFObject();
+            AVal metastring;
+            bool ret = false;
+
+            int nRes = AMFObject.AMF_Decode(obj, body, (int)len, false); // TODO:uint
+            if (nRes < 0)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding meta data packet", __FUNCTION__);
+                return false;
+            }
+
+            AMFObject.AMF_Dump(obj);
+            AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(obj, null, 0), out metastring);
+
+            if (AVal.Match(metastring, av_onMetaData))
+            {
+                AMFObjectProperty prop;
+                /* Show metadata */
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGINFO, "Metadata:");
+                DumpMetaData(obj);
+                if (RTMP_FindFirstMatchingProperty(obj, av_duration, out prop))
+                {
+                    r.m_fDuration = prop.p_number;
+                    /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Set duration: %.2f", m_fDuration); */
+                }
+
+                /* Search for audio or video tags */
+                if (RTMP_FindPrefixProperty(obj, av_video, out prop))
+                {
+                    r.m_read.dataType |= 1;
+                }
+
+                if (RTMP_FindPrefixProperty(obj, av_audio, out prop))
+                {
+                    r.m_read.dataType |= 4;
+                }
+
+                ret = true;
+            }
+
+            AMFObject.AMF_Reset(obj);
+            return ret;
+        }
+
+        /// <summary> static void HandleChangeChunkSize(RTMP *r, const RTMPPacket *packet)</summary>
+        private static void HandleChangeChunkSize(RTMP r, RTMPPacket packet)
+        {
+            const string __FUNCTION__ = "HandleChangeChunkSize";
+            if (packet.BodySize >= 4)
+            {
+                r.m_inChunkSize = (int)AMF.AMF_DecodeInt32(packet.Body);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received: chunk size change to {1}", __FUNCTION__, r.m_inChunkSize);
+            }
+        }
+
+        /// <summary> static void HandleAudio(RTMP *r, const RTMPPacket *packet)</summary>
+        private static void HandleAudio(RTMP r, RTMPPacket packet)
+        {
+        }
+
+        /// <summary> static void HandleVideo(RTMP *r, const RTMPPacket *packet)</summary>
+        private static void HandleVideo(RTMP r, RTMPPacket packet)
+        {
+        }
+
+        /// <summary> static void HandleCtrl(RTMP *r, const RTMPPacket *packet)</summary>
+        private static void HandleCtrl(RTMP r, RTMPPacket packet)
+        {
+            const string __FUNCTION__ = "HandleCtrl";
+            short nType = -1;
+            if (packet.Body != null && packet.BodySize >= 2)
+            {
+                nType = (short)AMF.AMF_DecodeInt16(packet.Body);
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, received ctrl. type: {1}, len: {2}", __FUNCTION__, nType,
+                packet.BodySize);
+            /*RTMP_LogHex(packet.Body, packet.BodySize); */
+
+            if (packet.BodySize >= 6)
+            {
+                uint tmp;
+                switch (nType)
+                {
+                    case 0:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream Begin {1}", __FUNCTION__, tmp);
+                        break;
+
+                    case 1:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream EOF {1}", __FUNCTION__, tmp);
+                        if (r.m_pausing == 1)
+                        {
+                            r.m_pausing = 2;
+                        }
+
+                        break;
+
+                    case 2:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream Dry {1}", __FUNCTION__, tmp);
+                        break;
+
+                    case 4:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream IsRecorded {1}", __FUNCTION__, tmp);
+                        break;
+
+                    case 6: /* server ping. reply with pong. */
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Ping {1}", __FUNCTION__, tmp);
+                        RTMP_SendCtrl(r, 0x07, tmp, 0);
+                        break;
+
+                    /*
+                     * FMS 3.5 servers send the following two controls to let the client
+                     * know when the server has sent a complete buffer. I.e., when the
+                     * server has sent an amount of data equal to m_nBufferMS in duration.
+                     * The server meters its output so that data arrives at the client
+                     * in realtime and no faster.
+                     *
+                     * The rtmpdump program tries to set m_nBufferMS as large as
+                     * possible, to force the server to send data as fast as possible.
+                     * In practice, the server appears to cap this at about 1 hour's
+                     * worth of data. After the server has sent a complete buffer, and
+                     * sends this BufferEmpty message, it will wait until the play
+                     * duration of that buffer has passed before sending a new buffer.
+                     * The BufferReady message will be sent when the new buffer starts.
+                     * (There is no BufferReady message for the very first buffer;
+                     * presumably the Stream Begin message is sufficient for that
+                     * purpose.)
+                     *
+                     * If the network speed is much faster than the data bitrate, then
+                     * there may be long delays between the end of one buffer and the
+                     * start of the next.
+                     *
+                     * Since usually the network allows data to be sent at
+                     * faster than realtime, and rtmpdump wants to download the data
+                     * as fast as possible, we use this RTMP_LF_BUFX hack: when we
+                     * get the BufferEmpty message, we send a Pause followed by an
+                     * Unpause. This causes the server to send the next buffer immediately
+                     * instead of waiting for the full duration to elapse. (That's
+                     * also the purpose of the ToggleStream function, which rtmpdump
+                     * calls if we get a read timeout.)
+                     *
+                     * Media player apps don't need this hack since they are just
+                     * going to play the data in realtime anyway. It also doesn't work
+                     * for live streams since they obviously can only be sent in
+                     * realtime. And it's all moot if the network speed is actually
+                     * slower than the media bitrate.
+                     */
+                    case 31:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream BufferEmpty {1}", __FUNCTION__, tmp);
+                        if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_BUFX) != 0x00)
+                        {
+                            break;
+                        }
+
+                        if (r.m_pausing != 0)
+                        {
+                            r.m_pauseStamp = (uint)(r.m_mediaChannel < r.m_channelsAllocatedIn ? r.m_channelTimestamp[r.m_mediaChannel] : 0); // TODO:
+                            RTMP_SendPause(r, true, (int)r.m_pauseStamp); // TODO:
+                            r.m_pausing = 1;
+                        }
+                        else if (r.m_pausing == 2)
+                        {
+                            RTMP_SendPause(r, false, (int)r.m_pauseStamp); // TODO:
+                            r.m_pausing = 3;
+                        }
+                        break;
+
+                    case 32:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream BufferReady {1}", __FUNCTION__, tmp);
+                        break;
+
+                    default:
+                        tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream xx {1}", __FUNCTION__, tmp);
+                        break;
+                }
+            }
+
+            if (nType == 0x1A)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, SWFVerification ping received: ", __FUNCTION__);
+                if (packet.BodySize > 2 && packet.Body[2] > 0x01)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR,
+                        "{0}: SWFVerification Type {1} request not supported! Patches welcome...",
+                        __FUNCTION__, packet.Body[2]);
+                }
+#if CRYPTO
+    /*RTMP_LogHex(packet.Body, packet.BodySize); */
+
+    /* respond with HMAC SHA256 of decompressed SWF, key is the 30byte player key, also the last 30 bytes of the server handshake are applied */
+                else if (r.Link.SWFSize != 0x00)
+                {
+                    RTMP_SendCtrl(r, 0x1B, 0, 0);
+                }
+                else
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}: Ignoring SWFVerification request, use --swfVfy!", __FUNCTION__);
+                }
+#else
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}: Ignoring SWFVerification request, no CRYPTO support!", __FUNCTION__);
+#endif
+            }
+        }
+
+        /// <summary> static void HandleServerBW(RTMP *r, const RTMPPacket *packet)</summary>
+        private static void HandleServerBW(RTMP r, RTMPPacket packet)
+        {
+            const string __FUNCTION__ = "HandleServerBW";
+            r.m_nServerBW = (int)AMF.AMF_DecodeInt32(packet.Body); // TODO:
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: server BW = {1}", __FUNCTION__, r.m_nServerBW);
+        }
+
+        /// <summary> static void HandleClientBW(RTMP *r, const RTMPPacket *packet)</summary>
+        private static void HandleClientBW(RTMP r, RTMPPacket packet)
+        {
+            const string __FUNCTION__ = "HandleClientBW";
+            r.m_nClientBW = (int)AMF.AMF_DecodeInt32(packet.Body); // TODO:
+            if (packet.BodySize > 4)
+            {
+                r.m_nClientBW2 = packet.Body[4];
+            }
+            else
+            {
+                r.m_nClientBW2 = 0xFF; //-1;
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: client BW = {1} {2}", __FUNCTION__, r.m_nClientBW, r.m_nClientBW2);
+        }
+
+        /// <summary> #define HEX2BIN(a)	(((a)&0x40)?((a)&0xf)+9:((a)&0xf))</summary>
+        private static byte HEX2BIN(byte a)
+        {
+            return (byte)((a & 0x40) != 0x00 ? ((a & 0x0f) + 9) : (a & 0x0f));
+        }
+
+        /// <summary> static void DecodeTEA(AVal *key, AVal *test)</summary>
+        private static void DecodeTEA(AVal key, AVal text)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> static int SendSecureTokenResponse(RTMP *r, AVal *resp)</summary>
+        private static bool SendSecureTokenResponse(RTMP r, AVal resp)
+        {
+            var pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_secureTokenResponse);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, 0.0);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, resp);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int SendReleaseStream(RTMP *r)</summary>
+        private static bool SendReleaseStream(RTMP r)
+        {
+            var pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_releaseStream);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, r.Link.playpath);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int SendFCPublish(RTMP *r)
+        private static bool SendFCPublish(RTMP r)
+        {
+            byte[] pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_FCPublish);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, r.Link.playpath);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int SendFCSubscribe(RTMP *r, AVal *subscribepath)</summary>
+        private static bool SendFCSubscribe(RTMP r, AVal subscribepath)
+        {
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "FCSubscribe: {0}", subscribepath.to_s());
+            var pbuf = new byte[512];
+            var pend = pbuf.Length;
+            var enc = 0;
+
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_FCSubscribe);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, subscribepath);
+
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, true);
+        }
+
+        /// <summary> static int SendUsherToken(RTMP *r, AVal *usherToken)</summary>
+        private static bool SendUsherToken(RTMP r, AVal usherToken)
+        {
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "UsherToken: {0}", usherToken.to_s());
+            var pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_NetStream_Authenticate_UsherToken);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, usherToken);
+
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int SendPublish(RTMP *r)</summary>
+        private static bool SendPublish(RTMP r)
+        {
+            var pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_publish);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, r.Link.playpath);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            /* FIXME: should we choose live based on Link.lFlags & RTMP_LF_LIVE? */
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_live);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x04, /* source channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_LARGE,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = r.m_stream_id,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, true);
+        }
+
+        /// <summary> static int SendPlaylist(RTMP *r)</summary>
+        private static bool SendPlaylist(RTMP r)
+        {
+            var pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_set_playlist);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, 0);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            pbuf[enc++] = (byte)AMFDataType.AMF_ECMA_ARRAY;
+            pbuf[enc++] = 0;
+            pbuf[enc++] = 0;
+            pbuf[enc++] = 0;
+            pbuf[enc++] = (byte)AMFDataType.AMF_OBJECT;
+            enc = AMF.AMF_EncodeNamedString(pbuf, enc, pend, av_0, r.Link.playpath);
+            if ((enc == 0) || (enc + 3 >= pend))
+            {
+                return false;
+            }
+
+            pbuf[enc++] = 0;
+            pbuf[enc++] = 0;
+            pbuf[enc++] = (byte)AMFDataType.AMF_OBJECT_END;
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x08, /* we make 8 our stream channel */
+                HeaderType = RTMP_PACKET_SIZE_LARGE,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0, /* 0x01000000; */
+                InfoField2 = r.m_stream_id,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, true);
+        }
+
+        /// <summary> static int SendPlay(RTMP *r) </summary>
+        private static bool SendPlay(RTMP r)
+        {
+            const string __FUNCTION__ = "SendPlay";
+
+            var pbuf = new byte[1024];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_play);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, seekTime={1}, stopTime={2}, sending play: {3}",
+                __FUNCTION__, r.Link.seekTime, r.Link.stopTime, r.Link.playpath.to_s());
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, r.Link.playpath);
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            /* Optional parameters start and len.
+             *
+             * start: -2, -1, 0, positive number
+             *  -2: looks for a live stream, then a recorded stream,
+             *      if not found any open a live stream
+             *  -1: plays a live stream
+             * >=0: plays a recorded streams from 'start' milliseconds
+             */
+            if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_LIVE) != 0x00)
+            {
+                enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, -1000.0);
+            }
+            else
+            {
+                if (r.Link.seekTime > 0.0)
+                {
+                    enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.Link.seekTime); /* resume from here */
+                }
+                else
+                {
+                    enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, 0.0); /*-2000.0);*/
+                }
+                /* recorded as default, -2000.0 is not reliable since that freezes the player if the stream is not found */
+            }
+
+            if (enc == 0)
+            {
+                return false;
+            }
+
+            /* len: -1, 0, positive number
+             *  -1: plays live or recorded stream to the end (default)
+             *   0: plays a frame 'start' ms away from the beginning
+             *  >0: plays a live or recoded stream for 'len' milliseconds
+             */
+            /*enc += EncodeNumber(enc, -1.0); */
+            /* len */
+            if (r.Link.stopTime != 0)
+            {
+                enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.Link.stopTime - r.Link.seekTime);
+                if (enc == 0)
+                {
+                    return false;
+                }
+            }
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x08, /* we make 8 our stream channel */
+                HeaderType = RTMP_PACKET_SIZE_LARGE,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0, /* 0x01000000; */
+                InfoField2 = r.m_stream_id,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, true);
+        }
+
+        /// <summary> static int SendCheckBW(RTMP *r)</summary>
+        private static bool SendCheckBW(RTMP r)
+        {
+            var pbuf = new byte[256];
+            var pend = pbuf.Length;
+            var enc = 0;
+
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av__checkbw);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_LARGE,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0, /* RTMP_GetTime(); */
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            /* triggers _onbwcheck and eventually results in _onbwdone */
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int SendPong(RTMP *r, double txn) </summary>
+        private static bool SendPong(RTMP r, double txn)
+        {
+            var pbuf = new byte[256];
+            var pend = pbuf.Length;
+            var enc = 0;
+
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_pong);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, txn);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter), /* temp inc value. till we figure it out. */
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int SendCheckBWResult(RTMP *r, double txn)</summary>
+        private static bool SendCheckBWResult(RTMP r, double txn)
+        {
+            var pbuf = new byte[256];
+            var pend = pbuf.Length;
+            var enc = 0;
+            enc = AMF.AMF_EncodeString(pbuf, enc, pend, av__result);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, txn);
+            pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, (double)r.m_nBWCheckCounter++);
+
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter), /* temp inc value. till we figure it out. */
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
+
+            return RTMP_SendPacket(r, packet, false);
+        }
+
+        /// <summary> static int DumpMetaData(AMFObject *obj)</summary>
+        private static bool DumpMetaData(AMFObject obj)
+        {
+            for (var n = 0; n < obj.o_num; n++)
+            {
+                // char str [256] = "";
+                var str = string.Empty;
+                var prop = AMFObject.AMF_GetProp(obj, null, n);
+                switch (prop.p_type)
+                {
+                    case AMFDataType.AMF_OBJECT:
+                    case AMFDataType.AMF_ECMA_ARRAY:
+                    case AMFDataType.AMF_STRICT_ARRAY:
+                        if (prop.p_name.av_len != 0)
+                        {
+                            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGINFO, "{0}:", prop.p_name.to_s());
+                        }
+                        DumpMetaData(prop.p_object);
+                        break;
+
+                    case AMFDataType.AMF_NUMBER:
+                        // snprintf(str, 255, "%.2f", prop.p_vu.p_number);
+                        str = string.Format("{0:f2}", prop.p_number);
+                        break;
+
+                    case AMFDataType.AMF_BOOLEAN:
+                        // snprintf(str, 255, "%s", prop.p_vu.p_number != 0. ? "TRUE" : "FALSE");
+                        str = string.Format("{0}", (prop.p_number < 0 || prop.p_number > 0) ? "TRUE" : "FALSE");
+                        break;
+
+                    case AMFDataType.AMF_STRING:
+                        // len = snprintf(str, 255, "%.*s", prop.p_vu.p_aval.av_len, prop.p_vu.p_aval.av_val);
+                        str = string.Format("{0}", prop.p_aval.to_s());
+                        if (str.Length >= 1 && str[str.Length - 1] == '\n')
+                        {
+                            // str[len - 1] = '\0';
+                            str = str.Substring(0, str.Length - 1);
+                        }
+
+                        break;
+
+                    case AMFDataType.AMF_DATE:
+                        // snprintf(str, 255, "timestamp:%.2f", prop.p_vu.p_number);
+                        str = string.Format("timestamp:{0:f2}", prop.p_number);
+                        break;
+
+                    default:
+                        // snprintf(str, 255, "INVALID TYPE 0x%02x",(unsigned char )prop.p_type);
+                        str = string.Format("INVALID TYPE 0x{0:x02}", prop.p_type);
+                        break;
+                }
+
+                if (!string.IsNullOrEmpty(str) && prop.p_name != null && prop.p_name.av_len > 0)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGINFO, "  %-22.*s%s", prop.p_name.av_len, prop.p_name.av_val, str);
+                }
+            }
+
+            return false;
         }
 
         /* hashswf.c */
@@ -2892,7 +4239,7 @@ namespace librtmp
         public const int RTMP_READ_EOF = -1;
         public const int RTMP_READ_IGNORE = 0;
 
-        /* if bResume == TRUE */
+        /* if bResume == true */
 
         /// <summary> uint8_t initialFrameType </summary>
         public byte initialFrameType { get; set; }

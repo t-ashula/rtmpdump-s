@@ -678,6 +678,7 @@ namespace rtmpdump
                             dSeek = (uint)dStartOffset;
                         }
                     }
+
                     // Calculate the length of the stream to still play
                     if (dStopOffset > 0)
                     {

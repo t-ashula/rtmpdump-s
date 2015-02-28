@@ -787,9 +787,9 @@ namespace rtmpsuck
                 goto cleanup;
             }
 
-            RTMPPacket ps;
+            RTMPPacket ps = new RTMPPacket();
             while (RTMP.RTMP_IsConnected(server.rs)
-                   && RTMP.RTMP_ReadPacket(server.rs, out ps))
+                   && RTMP.RTMP_ReadPacket(server.rs, ps))
             {
                 if (!ps.IsReady())
                 {
@@ -866,7 +866,7 @@ namespace rtmpsuck
 
                 if (sr != 0)
                 {
-                    while (RTMP.RTMP_ReadPacket(server.rs, out ps))
+                    while (RTMP.RTMP_ReadPacket(server.rs, ps))
                     {
                         if (ps.IsReady())
                         {
@@ -938,7 +938,7 @@ namespace rtmpsuck
 
                 if (cr != 0)
                 {
-                    while (RTMP.RTMP_ReadPacket(server.rc, out pc))
+                    while (RTMP.RTMP_ReadPacket(server.rc, pc))
                     {
                         int sendit = 1;
                         if (pc.IsReady())

@@ -176,7 +176,7 @@ namespace librtmp
         public int m_numCalls { get; set; }
 
         /// <summary> RTMP_METHOD* m_methodCalls </summary>
-        public RTMP_METHOD[] m_methodCalls { get; set; } /* remote method calls queue */
+        public List<RTMP_METHOD> m_methodCalls { get; set; } /* remote method calls queue */
 
         /// <summary> int m_channelsAllocatedIn </summary>
         public int m_channelsAllocatedIn { get; set; }
@@ -1039,7 +1039,7 @@ namespace librtmp
             rbuf = new byte[nChunk]; // packet.Body + packet.BytesRead
             if (ReadN(r, rbuf, nChunk) != nChunk)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to read RTMP packet body. len: %u",
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to read RTMP packet body. len: {1}",
                     __FUNCTION__, packet.BodySize);
                 return false;
             }
@@ -1376,9 +1376,13 @@ namespace librtmp
                 {
                     ptr += 3 + method.av_len;
                     var txn = (int)AMF.AMF_DecodeNumber(packet.Body, ptr);
-                    var n = r.m_numCalls;
-                    AV_queue(r.m_methodCalls, ref n, method, txn); // TODO
-                    r.m_numCalls = n;
+                    r.m_methodCalls.Add(new RTMP_METHOD
+                    {
+                        name = method,
+                        num = txn
+                    });
+
+                    r.m_numCalls++;
                 }
             }
 
@@ -1696,6 +1700,7 @@ namespace librtmp
             r.Link = new RTMP_LNK { timeout = 30, swfAge = 30 };
             r.m_read = new RTMP_READ();
             r.m_write = new RTMPPacket();
+            r.m_methodCalls = new List<RTMP_METHOD>();
         }
 
         /// <summary> void RTMP_Close(RTMP *r); </summary>
@@ -1713,11 +1718,92 @@ namespace librtmp
 
         // int RTMP_LibVersion(void);
         // void RTMP_UserInterrupt(void);	/* user typed Ctrl-C */
+        /*
+        from http://jira.red5.org/confluence/display/docs/Ping:
+
+        Ping is the most mysterious message in RTMP and till now we haven't fully interpreted it yet. In summary, Ping message is used as a special command that are exchanged between client and server. This page aims to document all known Ping messages. Expect the list to grow.
+
+        The type of Ping packet is 0x4 and contains two mandatory parameters and two optional parameters. The first parameter is the type of Ping and in short integer. The second parameter is the target of the ping. As Ping is always sent in Channel 2 (control channel) and the target object in RTMP header is always 0 which means the Connection object, it's necessary to put an extra parameter to indicate the exact target object the Ping is sent to. The second parameter takes this responsibility. The value has the same meaning as the target object field in RTMP header. (The second value could also be used as other purposes, like RTT Ping/Pong. It is used as the timestamp.) The third and fourth parameters are optional and could be looked upon as the parameter of the Ping packet. Below is an unexhausted list of Ping messages.
+
+        * type 0: Clear the stream. No third and fourth parameters. The second parameter could be 0. After the connection is established, a Ping 0,0 will be sent from server to client. The message will also be sent to client on the start of Play and in response of a Seek or Pause/Resume request. This Ping tells client to re-calibrate the clock with the timestamp of the next packet server sends.
+        * type 1: Tell the stream to clear the playing buffer.
+        * type 3: Buffer time of the client. The third parameter is the buffer time in millisecond.
+        * type 4: Reset a stream. Used together with type 0 in the case of VOD. Often sent before type 0.
+        * type 6: Ping the client from server. The second parameter is the current time.
+        * type 7: Pong reply from client. The second parameter is the time the server sent with his ping request.
+        * type 26: SWFVerification request
+        * type 27: SWFVerification response
+        */
 
         /// <summary> int RTMP_SendCtrl(RTMP *r, short nType, unsigned int nObject,unsigned int nTime);</summary>
-        public static int RTMP_SendCtrl(RTMP r, short type, uint objCnt, uint times)
+        public static bool RTMP_SendCtrl(RTMP r, short nType, uint nObject, uint nTime)
         {
-            throw new NotImplementedException();
+            {
+                byte[] pbuf = new byte[256];
+                var pend = pbuf.Length;
+
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "sending ctrl. type: 0x{0:x4}", nType);
+
+                uint nSize;
+                switch (nType)
+                {
+                    case 0x03:
+                        nSize = 10;
+                        break; /* buffer time */
+                    case 0x1A:
+                        nSize = 3;
+                        break; /* SWF verify request */
+                    case 0x1B:
+                        nSize = 44;
+                        break; /* SWF verify response */
+                    default:
+                        nSize = 6;
+                        break;
+                }
+
+                var buf = 0;
+                buf = AMF.AMF_EncodeInt16(pbuf, buf, pend, (ushort)nType);
+
+                if (nType == 0x1B)
+                {
+#if CRYPTO
+                    // memcpy(buf, r->Link.SWFVerificationResponse, 42);
+                    Array.Copy(r.Link.SWFVerificationResponse, 0, pbuf, buf, 42);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Sending SWFVerification response: ");
+                    Log.RTMP_LogHex(Log.RTMP_LogLevel.RTMP_LOGDEBUG, packet.Body, packet.BodySize);
+#endif
+                }
+                else if (nType == 0x1A)
+                {
+                    pbuf[buf] = (byte)(nObject & 0xFF); // *buf = nObject & 0xff;
+                }
+                else
+                {
+                    if (nSize > 2)
+                    {
+                        buf = AMF.AMF_EncodeInt32(pbuf, buf, pend, nObject);
+                    }
+
+                    if (nSize > 6)
+                    {
+                        buf = AMF.AMF_EncodeInt32(pbuf, buf, pend, nTime);
+                    }
+                }
+
+                var packet = new RTMPPacket
+                {
+                    ChannelNum = 0x02, /* control channel (ping) */
+                    HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                    PacketType = RTMP_PACKET_TYPE_CONTROL,
+                    TimeStamp = 0, /* RTMP_GetTime(); */
+                    InfoField2 = 0,
+                    HasAbsTimestamp = false,
+                    Body = pbuf,
+                    BodySize = nSize
+                };
+
+                return RTMP_SendPacket(r, packet, false);
+            }
         }
 
         /* caller probably doesn't know current timestamp, should just use RTMP_Pause instead */
@@ -2566,7 +2652,13 @@ namespace librtmp
             if ((num & 0x0f) == 0x00)
             {
                 // *vals = realloc(*vals, (*num + 16) * sizeof(RTMP_METHOD));
-                Array.Resize(ref vals, num + 16); // TODO: XXXX
+                var ms = new RTMP_METHOD[num + 16];
+                for (var i = 0; i < num; ++i)
+                {
+                    ms[i] = vals[i];
+                }
+
+                vals = ms;
             }
 
             // tmp = malloc(av.av_len + 1);
@@ -2694,7 +2786,8 @@ namespace librtmp
             // free(r.m_vecChannelsOut);
             r.m_vecChannelsOut = null;
             r.m_channelsAllocatedOut = 0;
-            AV_clear(r.m_methodCalls, r.m_numCalls);
+            // AV_clear(r.m_methodCalls, r.m_numCalls);
+            r.m_methodCalls.Clear();
             r.m_methodCalls = null;
             r.m_numCalls = 0;
             r.m_numInvokes = 0;
@@ -2818,7 +2911,7 @@ namespace librtmp
 
             AMFObject obj = new AMFObject();
             int ret = 0;
-            var nRes = AMFObject.AMF_Decode(obj, body, (int)nBodySize, false);
+            var nRes = AMFObject.AMF_Decode(obj, body, offset, (int)nBodySize, false);
             if (nRes < 0)
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding invoke packet", __FUNCTION__);
@@ -2829,21 +2922,20 @@ namespace librtmp
             AVal method;
             AMFObjectProperty.AMFProp_GetString(AMFObject.AMF_GetProp(obj, null, 0), out method);
             var txn = AMFObjectProperty.AMFProp_GetNumber(AMFObject.AMF_GetProp(obj, null, 1));
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, server invoking <{1}>", __FUNCTION__, method.av_val);
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, server invoking <{1}>", __FUNCTION__, method.to_s());
 
             if (AVal.Match(method, av__result))
             {
                 AVal methodInvoked = null; // = { 0 };
-                int i;
 
-                for (i = 0; i < r.m_numCalls; i++)
+                for (var i = 0; i < r.m_numCalls; i++)
                 {
                     if (r.m_methodCalls[i].num == (int)txn)
                     {
                         methodInvoked = r.m_methodCalls[i].name;
-                        var n = r.m_numCalls;
-                        AV_erase(r.m_methodCalls, ref n, i, false);
-                        r.m_numCalls = n;
+                        // AV_erase(r.m_methodCalls, ref n, i, false);
+                        r.m_methodCalls.RemoveAt(i);
+                        r.m_numCalls--;
                         break;
                     }
                 }
@@ -2958,9 +3050,9 @@ namespace librtmp
                 {
                     if (AVal.Match(r.m_methodCalls[i].name, av__checkbw))
                     {
-                        var n = r.m_numCalls;
-                        AV_erase(r.m_methodCalls, ref n, i, true);
-                        r.m_numCalls = n;
+                        // AV_erase(r.m_methodCalls, ref n, i, true);
+                        r.m_methodCalls.RemoveAt(i);
+                        r.m_numCalls--;
                         break;
                     }
                 }
@@ -3050,9 +3142,9 @@ namespace librtmp
                     {
                         if (AVal.Match(r.m_methodCalls[i].name, av_play))
                         {
-                            var n = r.m_numCalls;
-                            AV_erase(r.m_methodCalls, ref n, i, true);
-                            r.m_numCalls = n;
+                            // AV_erase(r.m_methodCalls, ref n, i, true);
+                            r.m_methodCalls.RemoveAt(i);
+                            r.m_numCalls--;
                             break;
                         }
                     }
@@ -3064,9 +3156,10 @@ namespace librtmp
                     {
                         if (AVal.Match(r.m_methodCalls[i].name, av_publish))
                         {
-                            var n = r.m_numCalls;
-                            AV_erase(r.m_methodCalls, ref n, i, true);
-                            r.m_numCalls = n;
+                            // var n = r.m_numCalls;
+                            // AV_erase(r.m_methodCalls, ref n, i, true);
+                            r.m_methodCalls.RemoveAt(i);
+                            r.m_numCalls--;
                             break;
                         }
                     }
@@ -3099,9 +3192,10 @@ namespace librtmp
                 {
                     if (AVal.Match(r.m_methodCalls[i].name, av_set_playlist))
                     {
-                        var n = r.m_numCalls;
-                        AV_erase(r.m_methodCalls, ref n, i, true);
-                        r.m_numCalls = n;
+                        // var n = r.m_numCalls;
+                        // AV_erase(r.m_methodCalls, ref n, i, true);
+                        r.m_methodCalls.RemoveAt(i);
+                        r.m_numCalls--;
                         break;
                     }
                 }
@@ -3125,7 +3219,7 @@ namespace librtmp
             AVal metastring;
             bool ret = false;
 
-            int nRes = AMFObject.AMF_Decode(obj, body, (int)len, false); // TODO:uint
+            int nRes = AMFObject.AMF_Decode(obj, body, offset, (int)len, false); // TODO:uint
             if (nRes < 0)
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding meta data packet", __FUNCTION__);
@@ -3917,11 +4011,11 @@ namespace librtmp
         // void RTMPPacket_Free(RTMPPacket *p)
         public static void RTMPPacket_Free(RTMPPacket p)
         {
-            // if (p.Body != null)
-            // {
-            //// free(p.m_body - RTMP_MAX_HEADER_SIZE);
-            //  p.Body = null;
-            // }
+            if (p.Body != null)
+            {
+                // free(p.m_body - RTMP_MAX_HEADER_SIZE);
+                p.Body = null;
+            }
         }
 
         public static bool RTMPPacket_Alloc(RTMPPacket p, int nsize)

@@ -24,6 +24,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace librtmp
@@ -246,15 +247,26 @@ namespace librtmp
         /// <summary> void AMF_DecodeString(const char *data, AVal * str);</summary>
         public static void AMF_DecodeString(byte[] buf, int offset, out AVal str)
         {
-            var lenbuf = new[] { buf[offset], buf[offset + 1] };
-            var len = AMF_DecodeInt16(lenbuf);
+            var len = AMF_DecodeInt16(buf, offset);
             var data = new byte[len];
             Array.Copy(buf, offset + 2, data, 0, len);
             str = new AVal(data);
         }
 
-        // void AMF_DecodeLongString(const char *data, AVal * str);
-        // int AMF_DecodeBoolean(const char *data);
+        /// <summary> void AMF_DecodeLongString(const char *data, AVal * str);</summary>
+        public static void AMF_DecodeLongString(byte[] buf, int offset, out AVal str)
+        {
+            var len = AMF_DecodeInt32(buf, offset);
+            var data = new byte[len];
+            Array.Copy(buf, offset + 4, data, 0, len);
+            str = new AVal(data);
+        }
+
+        /// <summary> int AMF_DecodeBoolean(const char *data); </summary>
+        public static bool AMF_DecodeBoolean(byte[] buf, int data)
+        {
+            return buf[data] != 0;
+        }
 
         /// <summary> double AMF_DecodeNumber(const char *data);</summary>
         public static double AMF_DecodeNumber(byte[] buf, int offset = 0)
@@ -348,26 +360,70 @@ namespace librtmp
         public int o_num { get; set; }
 
         /// <summary> AMFObjectProperty o_props </summary>
-        public AMFObjectProperty[] o_props { get; set; }
+        public List<AMFObjectProperty> o_props { get; set; }
 
         // char* AMF_Encode(AMFObject* obj, char* pBuffer, char* pBufEnd);
         // char* AMF_EncodeEcmaArray(AMFObject* obj, char* pBuffer, char* pBufEnd);
         // char* AMF_EncodeArray(AMFObject* obj, char* pBuffer, char* pBufEnd);
 
         /// <summary> int AMF_Decode(AMFObject * obj, const char *pBuffer, int nSize, int bDecodeName); </summary>
-        public static int AMF_Decode(AMFObject obj, byte[] buf, int nSize, bool bDecodeName)
+        public static int AMF_Decode(AMFObject obj, byte[] buf, int pbuf, int nSize, bool bDecodeName)
         {
-            throw new NotImplementedException();
+            int nOriginalSize = nSize;
+            bool bError = false; /* if there is an error while decoding - try to at least find the end mark AMF_OBJECT_END */
+
+            obj.o_num = 0;
+            obj.o_props = null;
+            while (nSize > 0)
+            {
+                if (nSize >= 3)
+                {
+                    if (AMF.AMF_DecodeInt24(buf, pbuf) == (uint)AMFDataType.AMF_OBJECT_END)
+                    {
+                        nSize -= 3;
+                        bError = false;
+                        break;
+                    }
+                }
+
+                if (bError)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "DECODING ERROR, IGNORING BYTES UNTIL NEXT KNOWN PATTERN!");
+                    nSize--;
+                    pbuf++;
+                    continue;
+                }
+
+                AMFObjectProperty prop = new AMFObjectProperty();
+                int nRes = AMFObjectProperty.AMFProp_Decode(prop, buf, pbuf, nSize, bDecodeName);
+                if (nRes == -1)
+                {
+                    bError = true;
+                }
+                else
+                {
+                    nSize -= nRes;
+                    pbuf += nRes;
+                    AMF_AddProp(obj, prop);
+                }
+            }
+
+            if (bError)
+            {
+                return -1;
+            }
+
+            return nOriginalSize - nSize;
         }
 
         /// <summary> int AMF_DecodeArray(AMFObject * obj, const char *pBuffer, int nSize,int nArrayLen, int bDecodeName); </summary>
-        public static int AMF_DecodeArray(AMFObject obj, byte[] buffer, int nSize, int nArrayLen, int bDecodeName)
+        public static int AMF_DecodeArray(AMFObject obj, byte[] buf, int pBuffer, int nSize, int nArrayLen, bool bDecodeName)
         {
             throw new NotImplementedException();
         }
 
         /// <summary> int AMF3_Decode(AMFObject * obj, const char *pBuffer, int nSize, int bDecodeName); </summary>
-        public static int AMF3_Decode(AMFObject obj, byte[] buffer, int nSize, int bDecodeName)
+        public static int AMF3_Decode(AMFObject obj, byte[] buffer, int pBuffer, int nSize, bool bDecodeName)
         {
             throw new NotImplementedException();
         }
@@ -375,19 +431,38 @@ namespace librtmp
         /// <summary> void AMF_Dump(AMFObject* obj); </summary>
         public static void AMF_Dump(AMFObject obj)
         {
-            throw new NotImplementedException();
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "(object begin)");
+            for (var n = 0; n < obj.o_num; n++)
+            {
+                AMFObjectProperty.AMFProp_Dump(obj.o_props[n]);
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "(object end)");
         }
 
         /// <summary> void AMF_Reset(AMFObject * obj); </summary>
         public static void AMF_Reset(AMFObject obj)
         {
-            throw new NotImplementedException();
+            for (var n = 0; n < obj.o_num; n++)
+            {
+                AMFObjectProperty.AMFProp_Reset(obj.o_props[n]);
+            }
+
+            // free(obj.o_props);
+            obj.o_props = new List<AMFObjectProperty>();
+            obj.o_num = 0;
         }
 
         /// <summary> void AMF_AddProp(AMFObject * obj, const AMFObjectProperty * prop); </summary>
-        public static void AMF_AddProp(AMFObject obj, AMFObjectProperty prrop)
+        public static void AMF_AddProp(AMFObject obj, AMFObjectProperty prop)
         {
-            throw new NotImplementedException();
+            if (obj.o_props == null)
+            {
+                obj.o_props = new List<AMFObjectProperty>();
+            }
+
+            obj.o_props.Add(prop);
+            obj.o_num++;
         }
 
         /// <summary> int AMF_CountProp(AMFObject * obj); </summary>
@@ -399,13 +474,41 @@ namespace librtmp
         /// <summary> AMFObjectProperty *AMF_GetProp(AMFObject * obj, const AVal * name, int nIndex); </summary>
         public static AMFObjectProperty AMF_GetProp(AMFObject obj, AVal name, int nIndex)
         {
-            throw new NotImplementedException();
+            if (nIndex >= 0)
+            {
+                if (nIndex < obj.o_num)
+                {
+                    return obj.o_props[nIndex];
+                }
+            }
+            else
+            {
+                for (var n = 0; n < obj.o_num; n++)
+                {
+                    if (AVal.Match(obj.o_props[n].p_name, name))
+                    {
+                        return obj.o_props[n];
+                    }
+                }
+            }
+
+            // return (AMFObjectProperty*)&AMFProp_Invalid;
+            return AMFObjectProperty.AMFProp_Invalid;
         }
     }
 
     /// <summary> struct AMFObjectProperty </summary>
     public class AMFObjectProperty
     {
+        public static readonly AMFObjectProperty AMFProp_Invalid = new AMFObjectProperty { p_type = AMFDataType.AMF_INVALID };
+
+        public AMFObjectProperty()
+        {
+            p_name = new AVal();
+            p_aval = new AVal();
+            p_object = new AMFObject();
+        }
+
         /// <summary> AVal p_name </summary>
         public AVal p_name { get; set; }
 
@@ -448,7 +551,7 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        // void AMFProp_SetObject(AMFObjectProperty* prop, AMFObject* obj); </summary>
+        /// <summary> void AMFProp_SetObject(AMFObjectProperty* prop, AMFObject* obj); </summary>
         public static void AMFProp_SetObject(AMFObjectProperty prop, AMFObject obj)
         {
             throw new NotImplementedException();
@@ -469,19 +572,19 @@ namespace librtmp
         /// <summary> double AMFProp_GetNumber(AMFObjectProperty* prop); </summary>
         public static double AMFProp_GetNumber(AMFObjectProperty prop)
         {
-            throw new NotImplementedException();
+            return prop.p_number;
         }
 
         /// <summary> int AMFProp_GetBoolean(AMFObjectProperty* prop); </summary>
         public static bool AMFProp_GetBoolean(AMFObjectProperty prop)
         {
-            throw new NotImplementedException();
+            return prop.p_number > 0 || prop.p_number < 0;
         }
 
         /// <summary> void AMFProp_GetString(AMFObjectProperty* prop, AVal* str); </summary>
         public static void AMFProp_GetString(AMFObjectProperty prop, out AVal str)
         {
-            throw new NotImplementedException();
+            str = prop.p_aval;
         }
 
         /// <summary> void AMFProp_GetObject(AMFObjectProperty* prop, AMFObject* obj); </summary>
@@ -496,10 +599,317 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        /// <summary>char * AMFProp_Encode(AMFObjectProperty *prop, char *pBuffer, char *pBufEnd)</summary>
+        /// <summary> char * AMFProp_Encode(AMFObjectProperty *prop, char *pBuffer, char *pBufEnd)</summary>
         public static int AMFProp_Encode(AMFObjectProperty prop, byte[] buf, int offset, int pend)
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary> int AMFProp_Decode(AMFObjectProperty *prop, const char *pBuffer, int nSize, int bDecodeName)</summary>
+        public static int AMFProp_Decode(AMFObjectProperty prop, byte[] buf, int pBuffer, int nSize, bool bDecodeName)
+        {
+            const string __FUNCTION__ = "AMFProp_Decode";
+            int nOriginalSize = nSize;
+
+            prop.p_name = new AVal();
+
+            if (nSize == 0 || pBuffer > buf.Length)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Empty buffer/no buffer pointer!", __FUNCTION__);
+                return -1;
+            }
+
+            if (bDecodeName && nSize < 4)
+            {
+                /* at least name (length + at least 1 byte) and 1 byte of data */
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}: Not enough data for decoding with name, less than 4 bytes!", __FUNCTION__);
+                return -1;
+            }
+
+            if (bDecodeName)
+            {
+                var nNameSize = AMF.AMF_DecodeInt16(buf, pBuffer);
+                if (nNameSize > nSize - 2)
+                {
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
+                        "{0}: Name size out of range: namesize ({1}) > len ({2}) - 2",
+                        __FUNCTION__, nNameSize, nSize);
+                    return -1;
+                }
+
+                AVal name;
+                AMF.AMF_DecodeString(buf, pBuffer, out name);
+                prop.p_name = name;
+                nSize -= 2 + nNameSize;
+                pBuffer += 2 + nNameSize;
+            }
+
+            if (nSize == 0)
+            {
+                return -1;
+            }
+
+            nSize--;
+
+            prop.p_type = (AMFDataType)buf[pBuffer++]; // *pBuffer++;
+            switch (prop.p_type)
+            {
+                case AMFDataType.AMF_NUMBER:
+                    if (nSize < 8)
+                    {
+                        return -1;
+                    }
+
+                    prop.p_number = AMF.AMF_DecodeNumber(buf, pBuffer);
+                    nSize -= 8;
+                    break;
+
+                case AMFDataType.AMF_BOOLEAN:
+                    if (nSize < 1)
+                    {
+                        return -1;
+                    }
+
+                    prop.p_number = AMF.AMF_DecodeBoolean(buf, pBuffer) ? 1 : 0;
+                    nSize--;
+                    break;
+
+                case AMFDataType.AMF_STRING:
+                    {
+                        var nStringSize = AMF.AMF_DecodeInt16(buf, pBuffer);
+
+                        if (nSize < (long)nStringSize + 2)
+                        {
+                            return -1;
+                        }
+
+                        AVal v;
+                        AMF.AMF_DecodeString(buf, pBuffer, out v);
+                        prop.p_aval = v;
+                        nSize -= (2 + nStringSize);
+                        break;
+                    }
+                case AMFDataType.AMF_OBJECT:
+                    {
+                        int nRes = AMFObject.AMF_Decode(prop.p_object, buf, pBuffer, nSize, true);
+                        if (nRes == -1)
+                        {
+                            return -1;
+                        }
+
+                        nSize -= nRes;
+                        break;
+                    }
+                case AMFDataType.AMF_MOVIECLIP:
+                    {
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "AMF_MOVIECLIP reserved!");
+                        return -1;
+                        break;
+                    }
+
+                case AMFDataType.AMF_NULL:
+                case AMFDataType.AMF_UNDEFINED:
+                case AMFDataType.AMF_UNSUPPORTED:
+                    prop.p_type = AMFDataType.AMF_NULL;
+                    break;
+
+                case AMFDataType.AMF_REFERENCE:
+                    {
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "AMF_REFERENCE not supported!");
+                        return -1;
+                    }
+                case AMFDataType.AMF_ECMA_ARRAY:
+                    {
+                        nSize -= 4;
+
+                        /* next comes the rest, mixed array has a final 0x000009 mark and names, so its an object */
+                        var nRes = AMFObject.AMF_Decode(prop.p_object, buf, pBuffer + 4, nSize, true);
+                        if (nRes == -1)
+                        {
+                            return -1;
+                        }
+
+                        nSize -= nRes;
+                    }
+                    break;
+
+                case AMFDataType.AMF_OBJECT_END:
+                    return -1;
+
+                case AMFDataType.AMF_STRICT_ARRAY:
+                    {
+                        var nArrayLen = AMF.AMF_DecodeInt32(buf, pBuffer);
+                        nSize -= 4;
+
+                        var nRes = AMFObject.AMF_DecodeArray(prop.p_object, buf, pBuffer + 4, nSize, (int)nArrayLen, false);
+                        if (nRes == -1)
+                        {
+                            return -1;
+                        }
+
+                        nSize -= nRes;
+                    }
+                    break;
+
+                case AMFDataType.AMF_DATE:
+                    {
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "AMF_DATE");
+
+                        if (nSize < 10)
+                        {
+                            return -1;
+                        }
+
+                        prop.p_number = AMF.AMF_DecodeNumber(buf, pBuffer);
+                        prop.p_UTCoffset = (short)AMF.AMF_DecodeInt16(buf, pBuffer + 8);
+
+                        nSize -= 10;
+                        break;
+                    }
+
+                case AMFDataType.AMF_LONG_STRING:
+                case AMFDataType.AMF_XML_DOC:
+                    {
+                        var nStringSize = AMF.AMF_DecodeInt32(buf, pBuffer);
+                        if (nSize < (long)nStringSize + 4)
+                        {
+                            return -1;
+                        }
+
+                        AVal v;
+                        AMF.AMF_DecodeLongString(buf, pBuffer, out v);
+                        prop.p_aval = v;
+                        nSize -= (int)(4 + nStringSize);
+                        if (prop.p_type == AMFDataType.AMF_LONG_STRING)
+                        {
+                            prop.p_type = AMFDataType.AMF_STRING;
+                        }
+
+                        break;
+                    }
+                case AMFDataType.AMF_RECORDSET:
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "AMF_RECORDSET reserved!");
+                    return -1;
+
+                case AMFDataType.AMF_TYPED_OBJECT:
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "AMF_TYPED_OBJECT not supported!");
+                    return -1;
+
+                case AMFDataType.AMF_AVMPLUS:
+                    {
+                        var nRes = AMFObject.AMF3_Decode(prop.p_object, buf, pBuffer, nSize, true);
+                        if (nRes == -1)
+                        {
+                            return -1;
+                        }
+                        nSize -= nRes;
+                        prop.p_type = AMFDataType.AMF_OBJECT;
+                        break;
+                    }
+                default:
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0} - unknown datatype 0x{1:x2}, @{2}", __FUNCTION__, prop.p_type, pBuffer - 1);
+                    return -1;
+            }
+
+            return nOriginalSize - nSize;
+        }
+
+        /// <summary> void AMFProp_Dump(AMFObjectProperty *prop) </summary>
+        public static void AMFProp_Dump(AMFObjectProperty prop)
+        {
+            string strRes = string.Empty;
+            string str = string.Empty;
+            AVal name;
+
+            if (prop.p_type == AMFDataType.AMF_INVALID)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: INVALID");
+                return;
+            }
+
+            if (prop.p_type == AMFDataType.AMF_NULL)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: NULL");
+                return;
+            }
+
+            name = prop.p_name.av_len != 0 ? prop.p_name : AVal.AVC("no-name.");
+
+            if (name.av_len > 18)
+            {
+                name.av_len = 18;
+            }
+
+            // snprintf(strRes, 255, "Name: %18.*s, ", name.av_len, name.av_val);
+            strRes = string.Format("Name: {0,-18}, ", name.to_s(18));
+
+            if (prop.p_type == AMFDataType.AMF_OBJECT)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: <{0}OBJECT>", strRes);
+                AMFObject.AMF_Dump(prop.p_object);
+                return;
+            }
+
+            if (prop.p_type == AMFDataType.AMF_ECMA_ARRAY)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: <{0}ECMA_ARRAY>", strRes);
+                AMFObject.AMF_Dump(prop.p_object);
+                return;
+            }
+
+            if (prop.p_type == AMFDataType.AMF_STRICT_ARRAY)
+            {
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: <{0}STRICT_ARRAY>", strRes);
+                AMFObject.AMF_Dump(prop.p_object);
+                return;
+            }
+
+            switch (prop.p_type)
+            {
+                case AMFDataType.AMF_NUMBER:
+                    // snprintf(str, 255, "NUMBER:\t%.2f", prop.p_vu.p_number);
+                    str = string.Format("NUMBER:\t{0:F2}", prop.p_number);
+                    break;
+
+                case AMFDataType.AMF_BOOLEAN:
+                    // snprintf(str, 255, "BOOLEAN:\t%s", prop.p_vu.p_number != 0.0 ? "TRUE" : "FALSE");
+                    str = string.Format("BOOLEAN:\t{0}", prop.p_number != 0.0 ? "TRUE" : "FALSE");
+                    break;
+
+                case AMFDataType.AMF_STRING:
+                    // snprintf(str, 255, "STRING:\t%.*s", prop.p_vu.p_aval.av_len, prop.p_vu.p_aval.av_val);
+                    str = string.Format("STRING:\t{0}", prop.p_aval.to_s());
+                    break;
+
+                case AMFDataType.AMF_DATE:
+                    // snprintf(str, 255, "DATE:\ttimestamp: %.2f, UTC offset: %d", prop.p_vu.p_number, prop.p_UTCoffset);
+                    str = string.Format("DATE:\ttimestamp: {0:F2}, UTC offset: {1}", prop.p_number, prop.p_UTCoffset);
+                    break;
+
+                default:
+                    // snprintf(str, 255, "INVALID TYPE 0x%02x", (unsigned char )prop.p_type);
+                    str = string.Format("INVALID TYPE 0x{0:x2}", prop.p_type);
+                    break;
+            }
+
+            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: <{0}{1}>", strRes, str);
+        }
+
+        /// <summary> void AMFProp_Reset(AMFObjectProperty* prop) </summary>
+        public static void AMFProp_Reset(AMFObjectProperty prop)
+        {
+            if (prop.p_type == AMFDataType.AMF_OBJECT
+                || prop.p_type == AMFDataType.AMF_ECMA_ARRAY
+                || prop.p_type == AMFDataType.AMF_STRICT_ARRAY)
+            {
+                AMFObject.AMF_Reset(prop.p_object);
+            }
+            else
+            {
+                prop.p_aval = null;
+            }
+
+            prop.p_type = AMFDataType.AMF_INVALID;
         }
     }
 }

@@ -915,7 +915,7 @@ namespace rtmpdump
                         }
 
                         AMFObject metaObj = new AMFObject();
-                        int nRes = AMFObject.AMF_Decode(metaObj, buffer, (int)dataSize, false);
+                        int nRes = AMFObject.AMF_Decode(metaObj, buffer, 0, (int)dataSize, false);
                         if (nRes < 0)
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding meta data packet", __FUNCTION__);

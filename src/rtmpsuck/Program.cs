@@ -28,7 +28,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -159,7 +158,7 @@ namespace rtmpsuck
         /// <param name="pack"></param>
         /// <param name="body"></param>
         /// <returns></returns>
-        private int ServeInvoke(STREAMING_SERVER server, int which, RTMPPacket pack, byte[] body)
+        private int ServeInvoke(STREAMING_SERVER server, int which, RTMPPacket pack, byte[] body, int offset)
         {
             var __FUNCTION__ = "ServeInvoke";
 
@@ -176,7 +175,7 @@ namespace rtmpsuck
             }
 
             AMFObject obj = new AMFObject(); // TODO:
-            var nRes = AMFObject.AMF_Decode(obj, body, bodySize, false);
+            var nRes = AMFObject.AMF_Decode(obj, body, offset, bodySize, false);
             if (nRes < 0)
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, error decoding invoke packet", __FUNCTION__);
@@ -521,7 +520,7 @@ namespace rtmpsuck
                 case RTMPPacket.RTMP_PACKET_TYPE_FLEX_MESSAGE:
                     // flex message
                     {
-                        ret = ServeInvoke(server, which, packet, packet.Body.Skip(1).ToArray());
+                        ret = ServeInvoke(server, which, packet, packet.Body, 1);
                         break;
                     }
                 case RTMPPacket.RTMP_PACKET_TYPE_INFO:
@@ -534,7 +533,7 @@ namespace rtmpsuck
 
                 case RTMPPacket.RTMP_PACKET_TYPE_INVOKE:
                     // invoke
-                    ret = ServeInvoke(server, which, packet, packet.Body);
+                    ret = ServeInvoke(server, which, packet, packet.Body, 0);
                     break;
 
                 case RTMPPacket.RTMP_PACKET_TYPE_FLASH_VIDEO:

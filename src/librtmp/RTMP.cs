@@ -24,7 +24,6 @@
  */
 
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -236,7 +235,7 @@ namespace librtmp
         /// <summary> double RTMP_GetDuration(RTMP *r); </summary>
         public static double RTMP_GetDuration(RTMP r)
         {
-            throw new NotImplementedException();
+            return r.m_fDuration;
         }
 
         /// <summary> int RTMP_IsConnected(RTMP *r); </summary>

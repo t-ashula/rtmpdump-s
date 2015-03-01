@@ -253,7 +253,7 @@ namespace librtmp
         /// <summary> int RTMP_IsTimedout(RTMP *r);</summary>
         public static bool RTMP_IsTimedout(RTMP r)
         {
-            throw new NotImplementedException();
+            return r.m_sb.sb_timedout;
         }
 
         /// <summary> void RTMP_SetBufferMS(RTMP *r, int size);</summary>

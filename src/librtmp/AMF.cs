@@ -590,13 +590,13 @@ namespace librtmp
         /// <summary> void AMFProp_GetObject(AMFObjectProperty* prop, AMFObject* obj); </summary>
         public static void AMFProp_GetObject(AMFObjectProperty prop, out AMFObject obj)
         {
-            throw new NotImplementedException();
+            obj = prop.p_object;
         }
 
         /// <summary> int AMFProp_IsValid(AMFObjectProperty* prop); </summary>
-        public static int AMFProp_IsValid(AMFObjectProperty prop)
+        public static bool AMFProp_IsValid(AMFObjectProperty prop)
         {
-            throw new NotImplementedException();
+            return prop.p_type != AMFDataType.AMF_INVALID;
         }
 
         /// <summary> char * AMFProp_Encode(AMFObjectProperty *prop, char *pBuffer, char *pBufEnd)</summary>
@@ -817,10 +817,6 @@ namespace librtmp
         /// <summary> void AMFProp_Dump(AMFObjectProperty *prop) </summary>
         public static void AMFProp_Dump(AMFObjectProperty prop)
         {
-            string strRes = string.Empty;
-            string str = string.Empty;
-            AVal name;
-
             if (prop.p_type == AMFDataType.AMF_INVALID)
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Property: INVALID");
@@ -833,7 +829,7 @@ namespace librtmp
                 return;
             }
 
-            name = prop.p_name.av_len != 0 ? prop.p_name : AVal.AVC("no-name.");
+            var name = prop.p_name.av_len != 0 ? prop.p_name : AVal.AVC("no-name.");
 
             if (name.av_len > 18)
             {
@@ -841,7 +837,7 @@ namespace librtmp
             }
 
             // snprintf(strRes, 255, "Name: %18.*s, ", name.av_len, name.av_val);
-            strRes = string.Format("Name: {0,-18}, ", name.to_s(18));
+            var strRes = string.Format("Name: {0,-18}, ", name.to_s(18));
 
             if (prop.p_type == AMFDataType.AMF_OBJECT)
             {
@@ -864,6 +860,7 @@ namespace librtmp
                 return;
             }
 
+            string str;
             switch (prop.p_type)
             {
                 case AMFDataType.AMF_NUMBER:

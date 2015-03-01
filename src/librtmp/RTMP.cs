@@ -1858,26 +1858,23 @@ namespace librtmp
         /// <summary> int RTMP_SendCreateStream(RTMP *r)</summary>
         public static bool RTMP_SendCreateStream(RTMP r)
         {
-            RTMPPacket packet = new RTMPPacket();
             var pbuf = new byte[256];
             var pend = pbuf.Length;
             var enc = 0;
-
-            packet.ChannelNum = 0x03; /* control channel (invoke) */
-            packet.HeaderType = RTMP_PACKET_SIZE_MEDIUM;
-            packet.PacketType = RTMP_PACKET_TYPE_INVOKE;
-            packet.TimeStamp = 0;
-            packet.InfoField2 = 0;
-            packet.HasAbsTimestamp = false;
-            packet.Body = pbuf;
-            ;
-
-            enc = RTMP_MAX_HEADER_SIZE;
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_createStream);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);
             pbuf[enc++] = (byte)AMFDataType.AMF_NULL; /* NULL */
-
-            packet.BodySize = (uint)enc; // - packet.Body;
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x03, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_MEDIUM,
+                PacketType = RTMP_PACKET_TYPE_INVOKE,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = (uint)enc
+            };
 
             return RTMP_SendPacket(r, packet, true);
         }
@@ -1887,22 +1884,22 @@ namespace librtmp
         /// <summary> int RTMP_SendServerBW(RTMP *r);</summary>
         public static bool RTMP_SendServerBW(RTMP r)
         {
-            RTMPPacket packet = new RTMPPacket();
             byte[] pbuf = new byte[256];
             var pend = pbuf.Length;
+            AMF.AMF_EncodeInt32(pbuf, 0, pend, (uint)r.m_nServerBW); //
 
-            packet.ChannelNum = 0x02; /* control channel (invoke) */
-            packet.HeaderType = RTMP_PACKET_SIZE_LARGE;
-            packet.PacketType = RTMP_PACKET_TYPE_SERVER_BW;
-            packet.TimeStamp = 0;
-            packet.InfoField2 = 0;
-            packet.HasAbsTimestamp = false;
-            packet.Body = pbuf;
-            ;
+            var packet = new RTMPPacket
+            {
+                ChannelNum = 0x02, /* control channel (invoke) */
+                HeaderType = RTMP_PACKET_SIZE_LARGE,
+                PacketType = RTMP_PACKET_TYPE_SERVER_BW,
+                TimeStamp = 0,
+                InfoField2 = 0,
+                HasAbsTimestamp = false,
+                Body = pbuf,
+                BodySize = 4
+            };
 
-            packet.BodySize = 4;
-
-            AMF.AMF_EncodeInt32(packet.Body, 0, pend, (uint)r.m_nServerBW); //
             return RTMP_SendPacket(r, packet, false);
         }
 
@@ -2645,6 +2642,7 @@ namespace librtmp
             return RTMP_SendPacket(r, packet, false);
         }
 
+#if UNUSE
         /// <summary> static void AV_queue(RTMP_METHOD** vals, int* num, AVal* av, int txn)</summary>
         private static void AV_queue(RTMP_METHOD[] vals, ref int num, AVal av, int txn)
         {
@@ -2711,6 +2709,7 @@ namespace librtmp
             vals[i].name.av_len = 0;
             vals[i].num = 0;
         }
+#endif
 
         /// <summary> static void CloseInternal(RTMP *r, int reconnect)</summary>
         private static void CloseInternal(RTMP r, bool reconnect)
@@ -2841,6 +2840,7 @@ namespace librtmp
         {
             var pbuf = new Byte[1024];
             int pend = pbuf.Length;
+
             var enc = 0; // char* enc;
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av_FCUnpublish);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, ++r.m_numInvokes);

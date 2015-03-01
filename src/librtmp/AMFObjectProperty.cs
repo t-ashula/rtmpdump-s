@@ -232,10 +232,8 @@ namespace librtmp
                         break;
                     }
                 case AMFDataType.AMF_MOVIECLIP:
-                    {
-                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "AMF_MOVIECLIP reserved!");
-                        return -1;
-                    }
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "AMF_MOVIECLIP reserved!");
+                    return -1;
 
                 case AMFDataType.AMF_NULL:
                 case AMFDataType.AMF_UNDEFINED:

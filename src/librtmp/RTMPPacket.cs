@@ -30,18 +30,6 @@ namespace librtmp
     /// <summary> struct RTMPPacket </summary>
     public class RTMPPacket
     {
-        /// <summary> #define RTMPPacket_IsReady(a)  ((a).m_nBytesRead == (a).m_nBodySize) </summary>
-        public bool IsReady()
-        {
-            return BytesRead == BodySize;
-        }
-
-        /// <summary> void RTMPPacket_Free(RTMPPacket *p); </summary>
-        public void Free()
-        {
-            throw new NotImplementedException();
-        }
-
         /// <summary> uint8_t m_headerType </summary>
         public byte HeaderType { get; set; }
 
@@ -96,7 +84,13 @@ namespace librtmp
         /*      RTMP_PACKET_TYPE_...                0x15 */
         public const byte RTMP_PACKET_TYPE_FLASH_VIDEO = 0x16;
 
-        // void RTMPPacket_Free(RTMPPacket *p)
+        /// <summary> #define RTMPPacket_IsReady(a)  ((a).m_nBytesRead == (a).m_nBodySize) </summary>
+        public bool IsReady()
+        {
+            return BytesRead == BodySize;
+        }
+
+        /// <summary> void RTMPPacket_Free(RTMPPacket *p); </summary>
         public static void RTMPPacket_Free(RTMPPacket p)
         {
             if (p.Body != null)
@@ -106,6 +100,7 @@ namespace librtmp
             }
         }
 
+        /// <summary> int RTMPPacket_Alloc(RTMPPacket *p, int nSize) </summary>
         public static bool RTMPPacket_Alloc(RTMPPacket p, int nsize)
         {
             p.Body = new byte[nsize + RTMP.RTMP_MAX_HEADER_SIZE];

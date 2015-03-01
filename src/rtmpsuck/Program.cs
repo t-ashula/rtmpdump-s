@@ -796,7 +796,7 @@ namespace rtmpsuck
                 }
 
                 ServePacket(server, 0, ps);
-                ps.Free();
+                RTMPPacket.RTMPPacket_Free(ps);
                 if (RTMP.RTMP_IsConnected(server.rc))
                 {
                     break;
@@ -928,8 +928,7 @@ namespace rtmpsuck
                             }
 
                             RTMP.RTMP_SendPacket(server.rc, ps, false);
-                            // RTMPPacket.RTMPPacket_Free(ps);
-                            ps.Free();
+                            RTMPPacket.RTMPPacket_Free(ps);
                             break;
                         }
                     }
@@ -1015,7 +1014,7 @@ namespace rtmpsuck
 
                         if (pc.IsReady())
                         {
-                            pc.Free();
+                            RTMPPacket.RTMPPacket_Free(ps);
                         }
 
                         break;

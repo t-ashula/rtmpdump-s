@@ -232,10 +232,7 @@ namespace librtmp
         /// <summary> RTMP_LNK Link </summary>
         public RTMP_LNK Link { get; set; }
 
-        /// <summary>R
-        /// uint32_t RTMP_GetTime()
-        /// </summary>
-        /// <returns></returns>
+        /// <summary> uint32_t RTMP_GetTime() </summary>
         public static uint RTMP_GetTime()
         {
 #if DEBUG
@@ -536,9 +533,7 @@ namespace librtmp
             r.m_nBufferMS = size;
         }
 
-        /// <summary>
-        /// void RTMP_UpdateBufferMS(RTMP *r);
-        /// </summary>
+        // void RTMP_UpdateBufferMS(RTMP *r);
         public static void RTMP_UpdateBufferMS(RTMP r)
         {
             throw new NotImplementedException();
@@ -550,7 +545,7 @@ namespace librtmp
             throw new NotImplementedException();
         }
 
-        /// <summary> int RTMP_SetupURL(RTMP *r, char *url); </summary>
+        // int RTMP_SetupURL(RTMP *r, char *url);
         public static bool RTMP_SetupURL(RTMP r, string url)
         {
             throw new NotImplementedException();

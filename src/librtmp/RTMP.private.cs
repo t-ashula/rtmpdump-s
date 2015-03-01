@@ -1883,8 +1883,12 @@ namespace librtmp
             r.m_vecChannelsOut = null;
             r.m_channelsAllocatedOut = 0;
             // AV_clear(r.m_methodCalls, r.m_numCalls);
-            r.m_methodCalls.Clear();
-            r.m_methodCalls = null;
+            if (r.m_numCalls > 0)
+            {
+                r.m_methodCalls.Clear();
+                r.m_methodCalls = null;
+            }
+
             r.m_numCalls = 0;
             r.m_numInvokes = 0;
 

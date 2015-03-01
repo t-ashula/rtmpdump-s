@@ -40,10 +40,20 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AMF.cs" />
-    <Compile Include="Class1.cs" />
+    <Compile Include="AMF3DataType.cs" />
+    <Compile Include="AMFDataType.cs" />
+    <Compile Include="AMFObject.cs" />
+    <Compile Include="AMFObjectProperty.cs" />
+    <Compile Include="AVal.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RTMP.cs" />
+    <Compile Include="RTMPChunk.cs" />
+    <Compile Include="RTMPPacket.cs" />
+    <Compile Include="RTMPSockBuf.cs" />
+    <Compile Include="RTMP_LNK.cs" />
+    <Compile Include="RTMP_METHOD.cs" />
+    <Compile Include="RTMP_READ.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

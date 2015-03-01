@@ -90,6 +90,20 @@ namespace librtmp
             return BytesRead == BodySize;
         }
 
+        /// <summary> void RTMPPacket_Reset(RTMPPacket *p) </summary>
+        public static void RTMPPacket_Reset(RTMPPacket p)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary> int RTMPPacket_Alloc(RTMPPacket *p, int nSize) </summary>
+        public static bool RTMPPacket_Alloc(RTMPPacket p, int nsize)
+        {
+            p.Body = new byte[nsize + RTMP.RTMP_MAX_HEADER_SIZE];
+            p.BytesRead = 0;
+            return true;
+        }
+
         /// <summary> void RTMPPacket_Free(RTMPPacket *p); </summary>
         public static void RTMPPacket_Free(RTMPPacket p)
         {
@@ -100,12 +114,10 @@ namespace librtmp
             }
         }
 
-        /// <summary> int RTMPPacket_Alloc(RTMPPacket *p, int nSize) </summary>
-        public static bool RTMPPacket_Alloc(RTMPPacket p, int nsize)
+        /// <summary> void RTMPPacket_Dump(RTMPPacket *p) </summary>
+        public static void RTMPPacket_Dump(RTMPPacket p)
         {
-            p.Body = new byte[nsize + RTMP.RTMP_MAX_HEADER_SIZE];
-            p.BytesRead = 0;
-            return true;
+            throw new NotImplementedException();
         }
     }
 }

@@ -47,7 +47,9 @@
     <Compile Include="AVal.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RTMP.constants.cs" />
     <Compile Include="RTMP.cs" />
+    <Compile Include="RTMP.private.cs" />
     <Compile Include="RTMPChunk.cs" />
     <Compile Include="RTMPPacket.cs" />
     <Compile Include="RTMPSockBuf.cs" />

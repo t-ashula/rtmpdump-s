@@ -99,7 +99,7 @@ namespace librtmp
         /// <summary> int RTMPPacket_Alloc(RTMPPacket *p, int nSize) </summary>
         public static bool RTMPPacket_Alloc(RTMPPacket p, int nsize)
         {
-            p.Body = new byte[nsize + RTMP.RTMP_MAX_HEADER_SIZE];
+            p.Body = new byte[nsize]; // + RTMP.RTMP_MAX_HEADER_SIZE];
             p.BytesRead = 0;
             return true;
         }

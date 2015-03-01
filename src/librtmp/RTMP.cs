@@ -24,6 +24,7 @@
  */
 
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -769,24 +770,18 @@ namespace librtmp
 
                 case RTMP_PACKET_TYPE_FLEX_STREAM_SEND:
                     /* flex stream send */
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
-                        "{0}, flex stream send, size {1} bytes, not supported, ignoring",
-                        __FUNCTION__, packet.BodySize);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, flex stream send, size {1} bytes, not supported, ignoring", __FUNCTION__, packet.BodySize);
                     break;
 
                 case RTMP_PACKET_TYPE_FLEX_SHARED_OBJECT:
                     /* flex shared object */
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
-                        "{0}, flex shared object, size {1} bytes, not supported, ignoring",
-                        __FUNCTION__, packet.BodySize);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, flex shared object, size {1} bytes, not supported, ignoring", __FUNCTION__, packet.BodySize);
                     break;
 
                 case RTMP_PACKET_TYPE_FLEX_MESSAGE:
                     /* flex message */
                     {
-                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
-                            "{0}, flex message, size {1} bytes, not fully supported",
-                            __FUNCTION__, packet.BodySize);
+                        Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, flex message, size {1} bytes, not fully supported", __FUNCTION__, packet.BodySize);
                         /*RTMP_LogHex(packet.Body, packet.BodySize); */
 
                         /* some DEBUG code */
@@ -850,6 +845,7 @@ namespace librtmp
                                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "Stream corrupt?!");
                                 break;
                             }
+
                             if (packet.Body[pos] == 0x12)
                             {
                                 HandleMetadata(r, packet.Body, pos + 11, dataSize);
@@ -875,8 +871,7 @@ namespace librtmp
                     break;
 
                 default:
-                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, unknown packet type received: 0x{1:x02}", __FUNCTION__,
-                        packet.PacketType);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, unknown packet type received: 0x{1:x02}", __FUNCTION__, packet.PacketType);
 #if  DEBUG
                     Log.RTMP_LogHex(Log.RTMP_LogLevel.RTMP_LOGDEBUG, packet.Body, packet.BodySize);
 #endif
@@ -1204,24 +1199,12 @@ namespace librtmp
             }
             else if (nSize < RTMP_LARGE_HEADER_SIZE)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "nSize < RTMP_LARGE_HEADER_SIZE");
                 /* using values from the last message of this channel */
-                if (r.m_vecChannelsIn[packet.ChannelNum] == null)
+                if (r.m_vecChannelsIn[packet.ChannelNum] != null)
                 {
+                    // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "nSize < RTMP_LARGE_HEADER_SIZE : {0}", packet.ChannelNum);
                     //memcpy(packet, r.m_vecChannelsIn[packet.ChannelNum], sizeof (RTMPPacket));
-                    r.m_vecChannelsIn[packet.ChannelNum] = new RTMPPacket
-                    {
-                        Body = packet.Body,
-                        BodySize = packet.BodySize,
-                        BytesRead = packet.BytesRead,
-                        ChannelNum = packet.ChannelNum,
-                        HasAbsTimestamp = packet.HasAbsTimestamp,
-                        HeaderType = packet.HeaderType,
-                        InfoField2 = packet.InfoField2,
-                        PacketType = packet.PacketType,
-                        Chunk = packet.Chunk,
-                        TimeStamp = packet.TimeStamp
-                    };
+                    packet = r.m_vecChannelsIn[packet.ChannelNum];
                 }
             }
 
@@ -1241,7 +1224,7 @@ namespace librtmp
             {
                 packet.TimeStamp = AMF.AMF_DecodeInt24(hbuf, header);
 
-                /*Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, reading RTMP packet chunk on channel %x, headersz %i, timestamp %i, abs timestamp %i", __FUNCTION__, packet.ChannelNum, nSize, packet.TimeStamp, packet.HasAbsTimestamp); */
+                // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, reading RTMP packet chunk on channel {1:x}, headersz {2}, timestamp {3}, abs timestamp {4}", __FUNCTION__, packet.ChannelNum, nSize, packet.TimeStamp, packet.HasAbsTimestamp);
 
                 if (nSize >= 6)
                 {
@@ -1269,6 +1252,7 @@ namespace librtmp
                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to read extended timestamp", __FUNCTION__);
                     return false;
                 }
+
                 Array.Copy(rbuf, 0, hbuf, header + nSize, 4);
                 packet.TimeStamp = AMF.AMF_DecodeInt32(rbuf);
                 hSize += 4;
@@ -1319,7 +1303,10 @@ namespace librtmp
 
             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
             Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, rbuf, (ulong)nChunk);
-            Array.Copy(rbuf, 0, packet.Body, packet.BytesRead, nChunk);
+            if (nChunk != 0)
+            {
+                Array.Copy(rbuf, 0, packet.Body, packet.BytesRead, nChunk);
+            }
             packet.BytesRead += (uint)nChunk;
 
             /* keep the packet as ref for other packets on this channel */
@@ -1328,30 +1315,29 @@ namespace librtmp
             //    r.m_vecChannelsIn[packet.ChannelNum] = malloc(sizeof (RTMPPacket));
             //}
             //memcpy(r.m_vecChannelsIn[packet.ChannelNum], packet, sizeof (RTMPPacket));
-            if (r.m_vecChannelsIn[packet.ChannelNum] == null)
+            var clonePacket = new RTMPPacket
             {
-                r.m_vecChannelsIn[packet.ChannelNum] = new RTMPPacket();
-            }
+                Body = (byte[])(packet.Body != null ? packet.Body.Clone() : null),
+                BodySize = packet.BodySize,
+                BytesRead = packet.BytesRead,
+                ChannelNum = packet.ChannelNum,
+                HasAbsTimestamp = packet.HasAbsTimestamp,
+                HeaderType = packet.HeaderType,
+                InfoField2 = packet.InfoField2,
+                PacketType = packet.PacketType,
+                TimeStamp = packet.TimeStamp,
+                Chunk = packet.Chunk == null
+                    ? null
+                    : new RTMPChunk
+                    {
+                        c_header = packet.Chunk.c_header,
+                        c_chunk = (byte[])packet.Chunk.c_chunk.Clone(), // TODO:
+                        c_chunkSize = packet.Chunk.c_chunkSize,
+                        c_headerSize = packet.Chunk.c_headerSize
+                    }
+            };
 
-            // TODO:
-            r.m_vecChannelsIn[packet.ChannelNum].Body = (byte[])packet.Body.Clone();
-            r.m_vecChannelsIn[packet.ChannelNum].BodySize = packet.BodySize;
-            r.m_vecChannelsIn[packet.ChannelNum].BytesRead = packet.BytesRead;
-            r.m_vecChannelsIn[packet.ChannelNum].ChannelNum = packet.ChannelNum;
-            r.m_vecChannelsIn[packet.ChannelNum].HasAbsTimestamp = packet.HasAbsTimestamp;
-            r.m_vecChannelsIn[packet.ChannelNum].HeaderType = packet.HeaderType;
-            r.m_vecChannelsIn[packet.ChannelNum].InfoField2 = packet.InfoField2;
-            r.m_vecChannelsIn[packet.ChannelNum].PacketType = packet.PacketType;
-            r.m_vecChannelsIn[packet.ChannelNum].TimeStamp = packet.TimeStamp;
-            r.m_vecChannelsIn[packet.ChannelNum].Chunk = packet.Chunk == null
-                ? null
-                : new RTMPChunk
-                {
-                    c_header = packet.Chunk.c_header,
-                    c_chunk = (byte[])packet.Chunk.c_chunk.Clone(), // TODO:
-                    c_chunkSize = packet.Chunk.c_chunkSize,
-                    c_headerSize = packet.Chunk.c_headerSize
-                };
+            r.m_vecChannelsIn[packet.ChannelNum] = clonePacket;
 
             if (extendedTimestamp)
             {

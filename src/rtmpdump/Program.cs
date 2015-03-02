@@ -743,7 +743,7 @@ namespace rtmpdump
                 }
 
                 nStatus = Download(rtmp, file,
-                    (uint)dSeek, (uint)dStopOffset, duration, bResume,
+                    dSeek, (uint)dStopOffset, duration, bResume,
                     metaHeader, nMetaHeaderSize, initialFrame,
                     initialFrameType, nInitialFrameSize, nSkipKeyFrames,
                     bStdoutMode, bLiveStream, bRealtimeStream, bHashes,
@@ -797,7 +797,7 @@ namespace rtmpdump
             out uint nMetaHeaderSize,
             ref double duration)
         {
-            var __FUNCTION__ = "OpenResumeFile";
+            const string __FUNCTION__ = "OpenResumeFile";
             var bufferSize = 0u; // size_t bufferSize = 0;
             var hbuf = new byte[16]; // char hbuf [16], *buffer = NULL;
             var buffer = new byte[0];
@@ -823,7 +823,6 @@ namespace rtmpdump
             if (size > 0)
             {
                 // verify FLV format and read header
-                uint prevTagSize = 0;
 
                 // check we've got a valid FLV file to continue!
                 // if (fread(hbuf, 1, 13, *file) != 13)
@@ -862,7 +861,7 @@ namespace rtmpdump
                     return RD_STATUS.RD_FAILED;
                 }
 
-                prevTagSize = AMF.AMF_DecodeInt32(hbuf);
+                var prevTagSize = AMF.AMF_DecodeInt32(hbuf);
                 if (prevTagSize != 0)
                 {
                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
@@ -929,7 +928,7 @@ namespace rtmpdump
                         {
                             AMFObject.AMF_Dump(metaObj);
 
-                            nMetaHeaderSize = (uint)dataSize;
+                            nMetaHeaderSize = dataSize;
                             // if (*metaHeader) free(*metaHeader);
                             // *metaHeader = (char*)malloc(*nMetaHeaderSize);
                             // memcpy(*metaHeader, buffer, *nMetaHeaderSize);
@@ -950,7 +949,7 @@ namespace rtmpdump
                         //delete obj;
                     }
 
-                    pos += (uint)(dataSize + 11 + 4); // TODO: uint
+                    pos += dataSize + 11 + 4; // TODO: uint
                 }
 
                 // free(buffer);
@@ -978,10 +977,9 @@ namespace rtmpdump
             out uint dSeek, out byte[] initialFrame, out byte initialFrameType, out uint nInitialFrameSize)
         // length of initialFrame [out]
         {
-            const int bufferSize = 16;
-            byte[] buffer = new byte[bufferSize];
+            const int BufferSize = 16;
+            byte[] buffer = new byte[BufferSize];
             byte dataType;
-            bool bAudioOnly; // int bAudioOnly;
             var size = file.Length;
 
             dSeek = 0;
@@ -1003,7 +1001,7 @@ namespace rtmpdump
                 return RD_STATUS.RD_FAILED;
             }
 
-            bAudioOnly = ((dataType & 0x4) != 0) && ((dataType & 0x1) == 0);
+            var bAudioOnly = ((dataType & 0x4) != 0) && ((dataType & 0x1) == 0);
 
             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "bAudioOnly: {0}, size: {1}", bAudioOnly, size);
 
@@ -1013,7 +1011,7 @@ namespace rtmpdump
             //{
             // find the last seekable frame
             var tsize = 0; // off_t tsize = 0;
-            int prevTagSize = 0; // uint32_t prevTagSize = 0;
+            int prevTagSize; // uint32_t prevTagSize = 0;
 
             // go through the file and find the last video keyframe
             do
@@ -1088,7 +1086,7 @@ namespace rtmpdump
                     goto skipkeyframe;
                 }
             }
-            while ((bAudioOnly && buffer[0] != 0x08)
+            while (bAudioOnly && buffer[0] != 0x08
                 || (!bAudioOnly
                     && (buffer[0] != 0x09 || (buffer[11] & 0xf0) != 0x10))); // as long as we don't have a keyframe / last audio frame
 
@@ -1195,11 +1193,9 @@ namespace rtmpdump
         {
             const string __FUNCTION__ = "Download";
             // int32_t now, lastUpdate;
-            int now, lastUpdate;
-            int bufferSize = 64 * 1024;
+            const int bufferSize = 64 * 1024;
             // char* buffer;
-            byte[] buffer;
-            int nRead = 0;
+            int nRead;
             // off_t size = ftello(file);
             var size = file.Position; // ftello(file)
             ulong lastPercent = 0;
@@ -1223,21 +1219,19 @@ namespace rtmpdump
                 // Workaround to exit with 0 if the file is fully (> 99.9%) downloaded
                 if (duration > 0)
                 {
-                    if ((double)rtmp.m_read.timestamp >= (double)duration * 999.0)
+                    if (rtmp.m_read.timestamp >= duration * 999.0)
                     {
                         Log.RTMP_LogPrintf(
                             "Already Completed at: {0:f3} sec Duration={1:f3} sec\n",
                              (double)rtmp.m_read.timestamp / 1000.0,
-                             (double)duration / 1000.0);
+                             duration / 1000.0);
                         return RD_STATUS.RD_SUCCESS;
                     }
-                    else
-                    {
-                        percent = (rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
-                        percent = ((double)(int)(percent * 10.0)) / 10.0;
-                        Log.RTMP_LogPrintf("{0} download at: {1:f3} kB / {2:f3} sec ({3:f1}%)\n",
-                             bResume ? "Resuming" : "Starting", (double)size / 1024.0, (double)rtmp.m_read.timestamp / 1000.0, percent);
-                    }
+
+                    percent = (rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
+                    percent = (int)(percent * 10.0) / 10.0;
+                    Log.RTMP_LogPrintf("{0} download at: {1:f3} kB / {2:f3} sec ({3:f1}%)\n",
+                        bResume ? "Resuming" : "Starting", (double)size / 1024.0, (double)rtmp.m_read.timestamp / 1000.0, percent);
                 }
                 else
                 {
@@ -1266,10 +1260,10 @@ namespace rtmpdump
             rtmp.m_read.nMetaHeaderSize = nMetaHeaderSize;
             rtmp.m_read.nInitialFrameSize = nInitialFrameSize;
 
-            buffer = new byte[bufferSize]; //(char*)malloc(bufferSize);
+            var buffer = new byte[bufferSize];
 
-            now = (int)RTMP.RTMP_GetTime(); // TODO:
-            lastUpdate = now - 1000;
+            var now = (int)RTMP.RTMP_GetTime();
+            var lastUpdate = now - 1000;
             do
             {
                 nRead = RTMP.RTMP_Read(rtmp, buffer, bufferSize);
@@ -1309,8 +1303,8 @@ namespace rtmpdump
                             RTMP.RTMP_UpdateBufferMS(rtmp);
                         }
 
-                        percent = ((double)rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
-                        percent = ((double)(int)(percent * 10.0)) / 10.0;
+                        percent = rtmp.m_read.timestamp / (duration * 1000.0) * 100.0;
+                        percent = (int)(percent * 10.0) / 10.0;
                         if (bHashes)
                         {
                             if (lastPercent + 1 <= percent)
@@ -1373,8 +1367,8 @@ namespace rtmpdump
             {
                 if (duration > 0)
                 {
-                    percent = ((double)rtmp.m_read.timestamp) / (duration * 1000.0) * 100.0;
-                    percent = ((double)(int)(percent * 10.0)) / 10.0;
+                    percent = rtmp.m_read.timestamp / (duration * 1000.0) * 100.0;
+                    percent = (int)(percent * 10.0) / 10.0;
                     Log.RTMP_LogStatus("\r{0:f3} kB / {1:f2} sec ({2:f1}%)",
                           (double)size / 1024.0, (double)(rtmp.m_read.timestamp) / 1000.0, percent);
                 }

@@ -606,7 +606,7 @@ namespace librtmp
 
             r.m_mediaChannel = 0;
 
-            while (!r.m_bPlaying && RTMP_IsConnected(r) && RTMP_ReadPacket(r, packet))
+            while (!r.m_bPlaying && RTMP_IsConnected(r) && RTMP_ReadPacket(r, ref packet))
             {
                 if (packet.IsReady())
                 {
@@ -655,7 +655,7 @@ namespace librtmp
         {
             int bHasMediaPacket = 0;
 
-            while (bHasMediaPacket == 0 && RTMP_IsConnected(r) && RTMP_ReadPacket(r, packet))
+            while (bHasMediaPacket == 0 && RTMP_IsConnected(r) && RTMP_ReadPacket(r, ref packet))
             {
                 if (!packet.IsReady())
                 {
@@ -1124,7 +1124,7 @@ namespace librtmp
         }
 
         /// <summary> int RTMP_ReadPacket(RTMP *r, RTMPPacket *packet); </summary>
-        public static bool RTMP_ReadPacket(RTMP r, RTMPPacket packet)
+        public static bool RTMP_ReadPacket(RTMP r, ref RTMPPacket packet)
         {
             const string __FUNCTION__ = "RTMP_ReadPaceket";
             byte[] hbuf = new byte[RTMP_MAX_HEADER_SIZE];
@@ -1203,7 +1203,20 @@ namespace librtmp
                 {
                     // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "nSize < RTMP_LARGE_HEADER_SIZE : {0}", packet.ChannelNum);
                     //memcpy(packet, r.m_vecChannelsIn[packet.ChannelNum], sizeof (RTMPPacket));
-                    packet = r.m_vecChannelsIn[packet.ChannelNum];
+                    var p = r.m_vecChannelsIn[packet.ChannelNum];
+                    packet = new RTMPPacket
+                    {
+                        Body = (byte[])p.Body.Clone(),
+                        BodySize = p.BodySize,
+                        BytesRead = p.BytesRead,
+                        ChannelNum = p.ChannelNum,
+                        Chunk = p.Chunk, // TODO:
+                        HasAbsTimestamp = p.HasAbsTimestamp,
+                        HeaderType = p.HeaderType,
+                        InfoField2 = p.InfoField2,
+                        PacketType = p.PacketType,
+                        TimeStamp = p.TimeStamp
+                    };
                 }
             }
 
@@ -1216,7 +1229,7 @@ namespace librtmp
                 return false;
             }
 
-            Array.Copy(rbuf, 0, hbuf, header, nSize); // TODO:
+            Array.Copy(rbuf, 0, hbuf, header, nSize);
             var hSize = nSize + (header);
 
             if (nSize >= 3)

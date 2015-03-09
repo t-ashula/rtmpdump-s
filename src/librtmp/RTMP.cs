@@ -1434,7 +1434,7 @@ namespace librtmp
             var nSize = packetSize[packet.HeaderType];
             var hSize = nSize;
             var cSize = 0;
-            var t = packet.TimeStamp - last;
+            var t = 0u; // packet.TimeStamp - last; // TODO:
 
             // char *header, *hptr, *hend, hbuf[RTMP_MAX_HEADER_SIZE], c;
             byte[] hbuf = new byte[RTMP_MAX_HEADER_SIZE];
@@ -1644,32 +1644,30 @@ namespace librtmp
                 }
             }
 
-            if (r.m_vecChannelsOut[packet.ChannelNum] == null)
-            {
-                // r.m_vecChannelsOut[packet.ChannelNum] = malloc(sizeof(RTMPPacket));
-                r.m_vecChannelsOut[packet.ChannelNum] = new RTMPPacket();
-            }
-
             // TODO:
             // memcpy(r.m_vecChannelsOut[packet.ChanelNum], packet, sizeof(RTMPPacket));
-            r.m_vecChannelsOut[packet.ChannelNum].BodySize = packet.BodySize;
-            r.m_vecChannelsOut[packet.ChannelNum].BytesRead = packet.BytesRead;
-            r.m_vecChannelsOut[packet.ChannelNum].ChannelNum = packet.ChannelNum;
-            r.m_vecChannelsOut[packet.ChannelNum].Chunk = packet.Chunk == null
-                ? null
-                : new RTMPChunk
-                {
-                    c_chunk = packet.Chunk.c_chunk,
-                    c_chunkSize = packet.Chunk.c_chunkSize,
-                    c_header = packet.Chunk.c_header,
-                    c_headerSize = packet.Chunk.c_headerSize
-                };
-            r.m_vecChannelsOut[packet.ChannelNum].HasAbsTimestamp = packet.HasAbsTimestamp;
-            r.m_vecChannelsOut[packet.ChannelNum].HeaderType = packet.HeaderType;
-            r.m_vecChannelsOut[packet.ChannelNum].InfoField2 = packet.InfoField2;
-            r.m_vecChannelsOut[packet.ChannelNum].PacketType = packet.PacketType;
-            r.m_vecChannelsOut[packet.ChannelNum].TimeStamp = packet.TimeStamp;
-            r.m_vecChannelsOut[packet.ChannelNum].Body = (byte[])packet.Body.Clone();
+            var clonePacket = new RTMPPacket
+            {
+                BodySize = packet.BodySize,
+                BytesRead = packet.BytesRead,
+                ChannelNum = packet.ChannelNum,
+                Chunk = packet.Chunk == null
+                    ? null
+                    : new RTMPChunk
+                    {
+                        c_chunk = packet.Chunk.c_chunk,
+                        c_chunkSize = packet.Chunk.c_chunkSize,
+                        c_header = packet.Chunk.c_header,
+                        c_headerSize = packet.Chunk.c_headerSize
+                    },
+                HasAbsTimestamp = packet.HasAbsTimestamp,
+                HeaderType = packet.HeaderType,
+                InfoField2 = packet.InfoField2,
+                PacketType = packet.PacketType,
+                TimeStamp = packet.TimeStamp,
+                Body = (byte[])packet.Body.Clone()
+            };
+            r.m_vecChannelsOut[packet.ChannelNum] = clonePacket;
 
             return true;
         }

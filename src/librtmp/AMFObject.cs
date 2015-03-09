@@ -95,7 +95,34 @@ namespace librtmp
         /// <summary> int AMF_DecodeArray(AMFObject * obj, const char *pBuffer, int nSize,int nArrayLen, int bDecodeName); </summary>
         public static int AMF_DecodeArray(AMFObject obj, byte[] buf, int pBuffer, int nSize, int nArrayLen, bool bDecodeName)
         {
-            throw new NotImplementedException();
+            int nOriginalSize = nSize;
+            bool bError = false;
+
+            obj.o_num = 0;
+            obj.o_props = null;
+            while (nArrayLen > 0)
+            {
+                AMFObjectProperty prop = new AMFObjectProperty();
+
+                nArrayLen--;
+
+                int nRes = AMFObjectProperty.AMFProp_Decode(prop, buf, pBuffer, nSize, bDecodeName);
+                if (nRes == -1)
+                {
+                    bError = true;
+                }
+                else
+                {
+                    nSize -= nRes;
+                    pBuffer += nRes;
+                    AMF_AddProp(obj, prop);
+                }
+            }
+
+            if (bError)
+                return -1;
+
+            return nOriginalSize - nSize;
         }
 
         /// <summary> int AMF3_Decode(AMFObject * obj, const char *pBuffer, int nSize, int bDecodeName); </summary>

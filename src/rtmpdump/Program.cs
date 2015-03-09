@@ -1267,7 +1267,7 @@ namespace rtmpdump
             do
             {
                 nRead = RTMP.RTMP_Read(rtmp, buffer, bufferSize);
-                //RTMP_LogPrintf("nRead: {0}\n", nRead);
+                Log.RTMP_LogPrintf("nRead: {0}\n", nRead);
                 if (nRead > 0)
                 {
                     // if (fwrite(buffer, sizeof (unsigned char ), nRead, file) != (size_t)nRead)

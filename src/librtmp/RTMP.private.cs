@@ -912,14 +912,14 @@ namespace librtmp
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av__result);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, txn);
             pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
-            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, (double)r.m_nBWCheckCounter++);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.m_nBWCheckCounter);
 
             var packet = new RTMPPacket
             {
                 ChannelNum = 0x03, /* control channel (invoke) */
                 HeaderType = RTMP_PACKET_SIZE_MEDIUM,
                 PacketType = RTMP_PACKET_TYPE_INVOKE,
-                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter), /* temp inc value. till we figure it out. */
+                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter++), /* temp inc value. till we figure it out. */
                 InfoField2 = 0,
                 HasAbsTimestamp = false,
                 Body = pbuf,
@@ -1994,8 +1994,8 @@ namespace librtmp
                 var nPacketLen = (int)packet.BodySize;
 
                 /* Return RTMP_READ_COMPLETE if this was completed nicely with
-                     * invoke message Play.Stop or Play.Complete
-                     */
+                 * invoke message Play.Stop or Play.Complete
+                 */
                 if (rtnGetNextMediaPacket == 2)
                 {
                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Got Play.Complete or Play.Stop from server. Assuming stream is complete");
@@ -2047,7 +2047,7 @@ namespace librtmp
                             && packet.PacketType == RTMP_PACKET_TYPE_INFO)
                         {
                             AMFObject metaObj = new AMFObject();
-                            int nRes = AMFObject.AMF_Decode(metaObj, packet.Body, packetBody, (int)nPacketLen, false);
+                            int nRes = AMFObject.AMF_Decode(metaObj, packet.Body, packetBody, nPacketLen, false);
                             if (nRes >= 0)
                             {
                                 AVal metastring;
@@ -2081,8 +2081,8 @@ namespace librtmp
                         }
 
                         /* check first keyframe to make sure we got the right position
-                             * in the stream! (the first non ignored frame)
-                             */
+                         * in the stream! (the first non ignored frame)
+                         */
                         if (r.m_read.nInitialFrameSize > 0)
                         {
                             /* video or audio data */
@@ -2192,7 +2192,7 @@ namespace librtmp
 
                             stopKeyframeSearch:
 
-                                if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTFLVK) != 0x00)
+                                if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTFLVK) == 0x00)
                                 {
                                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't find the seeked keyframe in this chunk!");
                                     ret = RTMP_READ.RTMP_READ_IGNORE;
@@ -2220,9 +2220,9 @@ namespace librtmp
                     }
 
                     /* skip till we find our keyframe
-                         * (seeking might put us somewhere before it)
-                         */
-                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTKF) != 0
+                     * (seeking might put us somewhere before it)
+                     */
+                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTKF) == 0
                         && packet.PacketType != RTMP_PACKET_TYPE_FLASH_VIDEO)
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
@@ -2237,7 +2237,7 @@ namespace librtmp
                     }
 
                     /* ok, do the same for FLV streams */
-                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTFLVK) != 0
+                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTFLVK) == 0
                         && packet.PacketType == RTMP_PACKET_TYPE_FLASH_VIDEO)
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
@@ -2255,7 +2255,7 @@ namespace librtmp
                          * later position there is only one copy and it will be ignored by
                          * the preceding if clause)
                          */
-                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_NO_IGNORE) != 0
+                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_NO_IGNORE) == 0
                         && packet.PacketType != RTMP_PACKET_TYPE_FLASH_VIDEO)
                     {
                         /* exclude type RTMP_PACKET_TYPE_FLASH_VIDEO since it can
@@ -2275,18 +2275,18 @@ namespace librtmp
                 }
 
                 /* calculate packet size and allocate slop buffer if necessary */
-                var size = (int)(nPacketLen +
-                                 ((packet.PacketType == RTMP_PACKET_TYPE_AUDIO
-                                   || packet.PacketType == RTMP_PACKET_TYPE_VIDEO
-                                   || packet.PacketType == RTMP_PACKET_TYPE_INFO) ? 11 : 0)
-                                 + (packet.PacketType != RTMP_PACKET_TYPE_FLASH_VIDEO ? 4 : 0));
+                var size = nPacketLen +
+                           ((packet.PacketType == RTMP_PACKET_TYPE_AUDIO
+                             || packet.PacketType == RTMP_PACKET_TYPE_VIDEO
+                             || packet.PacketType == RTMP_PACKET_TYPE_INFO) ? 11 : 0)
+                           + (packet.PacketType != RTMP_PACKET_TYPE_FLASH_VIDEO ? 4 : 0);
 
                 int ptr;
                 byte[] ptrBuf;
                 if (size + 4 > buflen)
                 {
                     /* the extra 4 is for the case of an FLV stream without a last
-                         * prevTagSize (we need extra 4 bytes to append it) */
+                     * prevTagSize (we need extra 4 bytes to append it) */
                     // r.m_read.buf = malloc(size + 4);
                     // if (r.m_read.buf == 0)
                     // {
@@ -2361,8 +2361,7 @@ namespace librtmp
                     /* grab first timestamp and see if it needs fixing */
                     nTimeStamp = AMF.AMF_DecodeInt24(packet.Body, packetBody + 4);
                     nTimeStamp |= (uint)(packet.Body[packetBody + 7] << 24);
-                    int delta = (int)(packet.TimeStamp - nTimeStamp);
-                    delta += (int)r.m_read.nResumeTS;
+                    int delta = (int)(packet.TimeStamp - nTimeStamp + r.m_read.nResumeTS);
 
                     while (pos + 11 < nPacketLen)
                     {

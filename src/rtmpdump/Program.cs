@@ -1193,11 +1193,11 @@ namespace rtmpdump
         {
             const string __FUNCTION__ = "Download";
             // int32_t now, lastUpdate;
-            const int bufferSize = 64 * 1024;
+            const int BufferSize = 64 * 1024;
             // char* buffer;
             int nRead;
             // off_t size = ftello(file);
-            var size = file.Position; // ftello(file)
+            var size = bStdoutMode ? 0 : file.Position; // ftello(file)
             ulong lastPercent = 0;
 
             rtmp.m_read.timestamp = dSeek;
@@ -1260,20 +1260,27 @@ namespace rtmpdump
             rtmp.m_read.nMetaHeaderSize = nMetaHeaderSize;
             rtmp.m_read.nInitialFrameSize = nInitialFrameSize;
 
-            var buffer = new byte[bufferSize];
+            var buffer = new byte[BufferSize];
 
             var now = (int)RTMP.RTMP_GetTime();
             var lastUpdate = now - 1000;
             do
             {
-                nRead = RTMP.RTMP_Read(rtmp, buffer, bufferSize);
+                nRead = RTMP.RTMP_Read(rtmp, buffer, BufferSize);
                 Log.RTMP_LogPrintf("nRead: {0}\n", nRead);
                 if (nRead > 0)
                 {
                     // if (fwrite(buffer, sizeof (unsigned char ), nRead, file) != (size_t)nRead)
                     try
                     {
-                        file.Write(buffer, 0, nRead);
+                        if (bStdoutMode)
+                        {
+                            Console.Write(buffer);
+                        }
+                        else
+                        {
+                            file.Write(buffer, 0, nRead);
+                        }
                     }
                     catch
                     {

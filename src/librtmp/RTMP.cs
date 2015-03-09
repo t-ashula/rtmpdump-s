@@ -651,7 +651,7 @@ namespace librtmp
         }
 
         /// <summary> int RTMP_GetNextMediaPacket(RTMP *r, RTMPPacket *packet);</summary>
-        public static int RTMP_GetNextMediaPacket(RTMP r, RTMPPacket packet)
+        public static int RTMP_GetNextMediaPacket(RTMP r, ref RTMPPacket packet)
         {
             int bHasMediaPacket = 0;
 
@@ -1202,11 +1202,11 @@ namespace librtmp
                 if (r.m_vecChannelsIn[packet.ChannelNum] != null)
                 {
                     // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "nSize < RTMP_LARGE_HEADER_SIZE : {0}", packet.ChannelNum);
-                    //memcpy(packet, r.m_vecChannelsIn[packet.ChannelNum], sizeof (RTMPPacket));
+                    // memcpy(packet, r.m_vecChannelsIn[packet.ChannelNum], sizeof (RTMPPacket));
                     var p = r.m_vecChannelsIn[packet.ChannelNum];
                     packet = new RTMPPacket
                     {
-                        Body = (byte[])p.Body.Clone(),
+                        Body = p.Body == null ? null : (byte[])p.Body.Clone(),
                         BodySize = p.BodySize,
                         BytesRead = p.BytesRead,
                         ChannelNum = p.ChannelNum,

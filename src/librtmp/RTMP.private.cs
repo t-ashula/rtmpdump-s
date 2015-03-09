@@ -1980,13 +1980,13 @@ namespace librtmp
         private static int Read_1_Packet(RTMP r, byte[] buf, int offset, int buflen)
         {
             var prevTagSize = 0;
-            int rtnGetNextMediaPacket = 0, ret = RTMP_READ.RTMP_READ_EOF;
-            RTMPPacket packet = new RTMPPacket();
+            var ret = RTMP_READ.RTMP_READ_EOF;
+            var packet = new RTMPPacket();
             var recopy = false;
             uint nTimeStamp = 0;
             int len;
 
-            rtnGetNextMediaPacket = RTMP_GetNextMediaPacket(r, packet);
+            var rtnGetNextMediaPacket = RTMP_GetNextMediaPacket(r, ref packet);
             while (rtnGetNextMediaPacket != 0)
             {
                 // char* packetBody = packet.m_body;
@@ -2090,10 +2090,10 @@ namespace librtmp
                                 && r.m_read.nInitialFrameSize == nPacketLen)
                             {
                                 /* we don't compare the sizes since the packet can
-                                     * contain several FLV packets, just make sure the
-                                     * first frame is our keyframe (which we are going
-                                     * to rewrite)
-                                     */
+                                 * contain several FLV packets, just make sure the
+                                 * first frame is our keyframe (which we are going
+                                 * to rewrite)
+                                 */
                                 var unmatch = false;
                                 for (var i = 0; i < r.m_read.nInitialFrameSize; ++i)
                                 {
@@ -2109,23 +2109,23 @@ namespace librtmp
                                     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "Checked keyframe successfully!");
                                     r.m_read.flags |= RTMP_READ.RTMP_READ_GOTKF;
                                     /* ignore it! (what about audio data after it? it is
-                                         * handled by ignoring all 0ms frames, see below)
-                                         */
+                                     * handled by ignoring all 0ms frames, see below)
+                                     */
                                     ret = RTMP_READ.RTMP_READ_IGNORE;
                                     break;
                                 }
                             }
 
                             /* hande FLV streams, even though the server resends the
-                                 * keyframe as an extra video packet it is also included
-                                 * in the first FLV stream chunk and we have to compare
-                                 * it and filter it out !!
-                                 */
+                             * keyframe as an extra video packet it is also included
+                             * in the first FLV stream chunk and we have to compare
+                             * it and filter it out !!
+                             */
                             if (packet.PacketType == RTMP_PACKET_TYPE_FLASH_VIDEO)
                             {
                                 /* basically we have to find the keyframe with the
-                                     * correct TS being nResumeTS
-                                     */
+                                 * correct TS being nResumeTS
+                                 */
                                 int pos = 0;
                                 uint ts = 0;
 
@@ -2142,7 +2142,7 @@ namespace librtmp
                                         packet.Body[packetBody + pos], dataSize, ts);
 #endif
                                     /* ok, is it a keyframe?: well doesn't work for audio! */
-                                    /*6928, test 0 */
+                                    /* 6928, test 0 */
                                     /* && (packetBody[11]&0xf0) == 0x10 */
                                     if (packet.Body[packetBody + pos] == r.m_read.initialFrameType)
                                     {
@@ -2152,11 +2152,11 @@ namespace librtmp
                                             var unmatch = memcmp(r.m_read.initialFrame, 0, packet.Body, packetBody + pos + 11, (int)r.m_read.nInitialFrameSize);
                                             if (r.m_read.nInitialFrameSize != dataSize || unmatch)
                                             {
-                                                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR,
-                                                    "FLV Stream: Keyframe doesn't match!");
+                                                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "FLV Stream: Keyframe doesn't match!");
                                                 ret = RTMP_READ.RTMP_READ_ERROR;
                                                 break;
                                             }
+
                                             r.m_read.flags |= RTMP_READ.RTMP_READ_GOTFLVK;
 
                                             /* skip this packet? check whether skippable: */
@@ -2173,7 +2173,8 @@ namespace librtmp
 
                                             goto stopKeyframeSearch;
                                         }
-                                        else if (r.m_read.nResumeTS < ts)
+
+                                        if (r.m_read.nResumeTS < ts)
                                         {
                                             /* the timestamp ts will only increase with
                                                  * further packets, wait for seek
@@ -2206,23 +2207,23 @@ namespace librtmp
                         && (r.m_read.flags & (RTMP_READ.RTMP_READ_GOTKF | RTMP_READ.RTMP_READ_GOTFLVK)) != 0x0)
                     {
                         /* another problem is that the server can actually change from
-                             * 09/08 video/audio packets to an FLV stream or vice versa and
-                             * our keyframe check will prevent us from going along with the
-                             * new stream if we resumed.
-                             *
-                             * in this case set the 'found keyframe' variables to true.
-                             * We assume that if we found one keyframe somewhere and were
-                             * already beyond TS > 0 we have written data to the output
-                             * which means we can accept all forthcoming data including the
-                             * change between 08/09 <. FLV packets
-                             */
+                         * 09/08 video/audio packets to an FLV stream or vice versa and
+                         * our keyframe check will prevent us from going along with the
+                         * new stream if we resumed.
+                         *
+                         * in this case set the 'found keyframe' variables to true.
+                         * We assume that if we found one keyframe somewhere and were
+                         * already beyond TS > 0 we have written data to the output
+                         * which means we can accept all forthcoming data including the
+                         * change between 08/09 <. FLV packets
+                         */
                         r.m_read.flags |= (RTMP_READ.RTMP_READ_GOTKF | RTMP_READ.RTMP_READ_GOTFLVK);
                     }
 
                     /* skip till we find our keyframe
                      * (seeking might put us somewhere before it)
                      */
-                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTKF) == 0
+                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTKF) == 0x00
                         && packet.PacketType != RTMP_PACKET_TYPE_FLASH_VIDEO)
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
@@ -2237,7 +2238,7 @@ namespace librtmp
                     }
 
                     /* ok, do the same for FLV streams */
-                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTFLVK) == 0
+                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_GOTFLVK) == 0x00
                         && packet.PacketType == RTMP_PACKET_TYPE_FLASH_VIDEO)
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
@@ -2250,27 +2251,25 @@ namespace librtmp
                     }
 
                     /* we have to ignore the 0ms frames since these are the first
-                         * keyframes; we've got these so don't mess around with multiple
-                         * copies sent by the server to us! (if the keyframe is found at a
-                         * later position there is only one copy and it will be ignored by
-                         * the preceding if clause)
-                         */
-                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_NO_IGNORE) == 0
+                     * keyframes; we've got these so don't mess around with multiple
+                     * copies sent by the server to us! (if the keyframe is found at a
+                     * later position there is only one copy and it will be ignored by
+                     * the preceding if clause)
+                     */
+                    if ((r.m_read.flags & RTMP_READ.RTMP_READ_NO_IGNORE) == 0x00
                         && packet.PacketType != RTMP_PACKET_TYPE_FLASH_VIDEO)
                     {
                         /* exclude type RTMP_PACKET_TYPE_FLASH_VIDEO since it can
-                             * contain several FLV packets
-                             */
+                         * contain several FLV packets
+                         */
                         if (packet.TimeStamp == 0)
                         {
                             ret = RTMP_READ.RTMP_READ_IGNORE;
                             break;
                         }
-                        else
-                        {
-                            /* stop ignoring packets */
-                            r.m_read.flags |= RTMP_READ.RTMP_READ_NO_IGNORE;
-                        }
+
+                        /* stop ignoring packets */
+                        r.m_read.flags |= RTMP_READ.RTMP_READ_NO_IGNORE;
                     }
                 }
 
@@ -2287,13 +2286,6 @@ namespace librtmp
                 {
                     /* the extra 4 is for the case of an FLV stream without a last
                      * prevTagSize (we need extra 4 bytes to append it) */
-                    // r.m_read.buf = malloc(size + 4);
-                    // if (r.m_read.buf == 0)
-                    // {
-                    //     Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Couldn't allocate memory!");
-                    //     ret = RTMP_READ.RTMP_READ_ERROR; /* fatal error */
-                    //     break;
-                    // }
                     r.m_read.buf = new byte[size + 4];
                     recopy = true;
                     ptr = 0; // r.m_read.buf;
@@ -2311,7 +2303,7 @@ namespace librtmp
                 /* use to return timestamp of last processed packet */
 
                 /* audio (0x08), video (0x09) or metadata (0x12) packets :
-                     * construct 11 byte header then add rtmp packet's data */
+                 * construct 11 byte header then add rtmp packet's data */
                 if (packet.PacketType == RTMP_PACKET_TYPE_AUDIO
                     || packet.PacketType == RTMP_PACKET_TYPE_VIDEO
                     || packet.PacketType == RTMP_PACKET_TYPE_INFO)

@@ -364,7 +364,7 @@ namespace librtmp
             }
 
             // snprintf(strRes, 255, "Name: %18.*s, ", name.av_len, name.av_val);
-            var strRes = string.Format("Name: {0,-18}, ", name.to_s(18));
+            var strRes = string.Format("Name: {0,18}, ", name.to_s(18));
 
             if (prop.p_type == AMFDataType.AMF_OBJECT)
             {

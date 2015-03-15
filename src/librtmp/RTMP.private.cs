@@ -1857,36 +1857,37 @@ namespace librtmp
             r.m_write.BytesRead = 0;
             RTMPPacket.RTMPPacket_Free(r.m_write);
 
-            for (var i = 0; i < r.m_channelsAllocatedIn; i++)
+            if (r.m_vecChannelsIn != null)
             {
-                if (r.m_vecChannelsIn[i] != null)
+                foreach (var p in r.m_vecChannelsIn)
                 {
-                    RTMPPacket.RTMPPacket_Free(r.m_vecChannelsIn[i]);
-                    // free(r.m_vecChannelsIn[i]);
-                    r.m_vecChannelsIn[i] = null;
+                    RTMPPacket.RTMPPacket_Free(p.Value);
                 }
+
+                r.m_vecChannelsIn = null;
             }
-            // free(r.m_vecChannelsIn);
-            r.m_vecChannelsIn = null;
-            // free(r.m_channelTimestamp);
+
+            if (r.m_vecChannelsOut != null)
+            {
+                foreach (var p in r.m_vecChannelsOut)
+                {
+                    RTMPPacket.RTMPPacket_Free(p.Value);
+                }
+
+                r.m_vecChannelsOut = null;
+            }
+
             r.m_channelTimestamp = null;
             r.m_channelsAllocatedIn = 0;
-            for (var i = 0; i < r.m_channelsAllocatedOut; i++)
-            {
-                if (r.m_vecChannelsOut[i] != null)
-                {
-                    // free(r.m_vecChannelsOut[i]);
-                    r.m_vecChannelsOut[i] = null;
-                }
-            }
-            // free(r.m_vecChannelsOut);
-            r.m_vecChannelsOut = null;
             r.m_channelsAllocatedOut = 0;
             // AV_clear(r.m_methodCalls, r.m_numCalls);
             if (r.m_numCalls > 0)
             {
-                r.m_methodCalls.Clear();
-                r.m_methodCalls = null;
+                if (r.m_methodCalls != null)
+                {
+                    r.m_methodCalls.Clear();
+                    r.m_methodCalls = null;
+                }
             }
 
             r.m_numCalls = 0;
@@ -2028,7 +2029,7 @@ namespace librtmp
                     ret = RTMP_READ.RTMP_READ_IGNORE;
                     break;
                 }
-#if  DEBUG
+#if _DEBUG
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
                     "type: {0:X02}, size: {1}, TS: {2} ms, abs TS: {3}",
                     packet.PacketType, nPacketLen, packet.TimeStamp, packet.HasAbsTimestamp);

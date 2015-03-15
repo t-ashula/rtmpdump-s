@@ -102,13 +102,16 @@ namespace librtmp
         public int m_channelsAllocatedOut { get; set; }
 
         /// <summary> RTMPPacket** m_vecChannelsIn </summary>
-        public RTMPPacket[] m_vecChannelsIn { get; set; }
+        // public RTMPPacket[] m_vecChannelsIn { get; set; }
+        public Dictionary<int, RTMPPacket> m_vecChannelsIn { get; set; }
 
         /// <summary> RTMPPacket** m_vecChannelsOut </summary>
-        public RTMPPacket[] m_vecChannelsOut { get; set; }
+        // public RTMPPacket[] m_vecChannelsOut { get; set; }
+        public Dictionary<int, RTMPPacket> m_vecChannelsOut { get; set; }
 
         /// <summary> int* m_channelTimestamp </summary>
-        public uint[] m_channelTimestamp { get; set; } /* abs timestamp of last packet */
+        // public uint[] m_channelTimestamp { get; set; } /* abs timestamp of last packet */
+        public Dictionary<int, uint> m_channelTimestamp { get; set; }
 
         /// <summary> double m_fAudioCodecs </summary>
         public double m_fAudioCodecs { get; set; } /* audioCodecs for the connect packet */
@@ -214,6 +217,9 @@ namespace librtmp
             r.m_sb = new RTMPSockBuf();
             r.m_inChunkSize = RTMP_DEFAULT_CHUNKSIZE;
             r.m_outChunkSize = RTMP_DEFAULT_CHUNKSIZE;
+            r.m_vecChannelsIn = new Dictionary<int, RTMPPacket>();
+            r.m_channelTimestamp = new Dictionary<int, uint>();
+            r.m_vecChannelsOut = new Dictionary<int, RTMPPacket>();
             r.m_nBufferMS = 30000;
             r.m_nClientBW = 2500000;
             r.m_nClientBW2 = 2;
@@ -1175,20 +1181,9 @@ namespace librtmp
 
             var nSize = packetSize[packet.HeaderType];
 
-            // TODO: resize array.
             if (packet.ChannelNum >= r.m_channelsAllocatedIn)
             {
                 int n = packet.ChannelNum + 10;
-                var timestamp = new uint[n];
-                var packets = new RTMPPacket[n];
-                for (var i = 0; i < r.m_channelsAllocatedIn; ++i)
-                {
-                    timestamp[i] = r.m_channelTimestamp[i];
-                    packets[i] = r.m_vecChannelsIn[i];
-                }
-
-                r.m_channelTimestamp = timestamp;
-                r.m_vecChannelsIn = packets;
                 r.m_channelsAllocatedIn = n;
             }
 
@@ -1199,23 +1194,23 @@ namespace librtmp
             else if (nSize < RTMP_LARGE_HEADER_SIZE)
             {
                 /* using values from the last message of this channel */
-                if (r.m_vecChannelsIn[packet.ChannelNum] != null)
+                RTMPPacket prevPacket;
+                if (r.m_vecChannelsIn.TryGetValue(packet.ChannelNum, out prevPacket))
                 {
                     // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "nSize < RTMP_LARGE_HEADER_SIZE : {0}", packet.ChannelNum);
                     // memcpy(packet, r.m_vecChannelsIn[packet.ChannelNum], sizeof (RTMPPacket));
-                    var p = r.m_vecChannelsIn[packet.ChannelNum];
                     packet = new RTMPPacket
                     {
-                        Body = p.Body == null ? null : (byte[])p.Body.Clone(),
-                        BodySize = p.BodySize,
-                        BytesRead = p.BytesRead,
-                        ChannelNum = p.ChannelNum,
-                        Chunk = p.Chunk, // TODO:
-                        HasAbsTimestamp = p.HasAbsTimestamp,
-                        HeaderType = p.HeaderType,
-                        InfoField2 = p.InfoField2,
-                        PacketType = p.PacketType,
-                        TimeStamp = p.TimeStamp
+                        Body = prevPacket.Body == null ? null : (byte[])prevPacket.Body.Clone(),
+                        BodySize = prevPacket.BodySize,
+                        BytesRead = prevPacket.BytesRead,
+                        ChannelNum = prevPacket.ChannelNum,
+                        Chunk = prevPacket.Chunk, // TODO:
+                        HasAbsTimestamp = prevPacket.HasAbsTimestamp,
+                        HeaderType = prevPacket.HeaderType,
+                        InfoField2 = prevPacket.InfoField2,
+                        PacketType = prevPacket.PacketType,
+                        TimeStamp = prevPacket.TimeStamp
                     };
                 }
             }
@@ -1390,22 +1385,16 @@ namespace librtmp
         public static bool RTMP_SendPacket(RTMP r, RTMPPacket packet, bool queue)
         {
             const string __FUNCTION__ = "RTMP_SendPacket";
-            uint last = 0;
 
             if (packet.ChannelNum >= r.m_channelsAllocatedOut)
             {
                 int n = packet.ChannelNum + 10;
-                var packets = new RTMPPacket[n];
-                for (var i = 0; i < r.m_channelsAllocatedOut; ++i)
-                {
-                    packets[i] = r.m_vecChannelsOut[i];
-                }
-
-                r.m_vecChannelsOut = packets;
                 r.m_channelsAllocatedOut = n;
             }
 
-            var prevPacket = r.m_vecChannelsOut[packet.ChannelNum];
+            var last = 0u;
+            RTMPPacket prevPacket;
+            r.m_vecChannelsOut.TryGetValue(packet.ChannelNum, out prevPacket);
             if (prevPacket != null && packet.HeaderType != RTMP_PACKET_SIZE_LARGE)
             {
                 /* compress a bit by using the prev packet's attributes */
@@ -1422,7 +1411,7 @@ namespace librtmp
                     packet.HeaderType = RTMP_PACKET_SIZE_MINIMUM;
                 }
 
-                last = prevPacket.TimeStamp;
+                last = packet.TimeStamp;
             }
 
             if (packet.HeaderType > 3) /* sanity */
@@ -1433,44 +1422,25 @@ namespace librtmp
 
             var nSize = packetSize[packet.HeaderType];
             var hSize = nSize;
-            var cSize = 0;
-            var t = 0u; // packet.TimeStamp - last; // TODO:
+            var t = packet.TimeStamp - last;
 
-            // char *header, *hptr, *hend, hbuf[RTMP_MAX_HEADER_SIZE], c;
-            byte[] hbuf = new byte[RTMP_MAX_HEADER_SIZE];
-            int header, hend;
-            // TODO: packet.Body
-            if (packet.Body != null)
-            {
-                header = 0; // packet.Body - nSize;
-                hend = nSize; // packet.Body;
-                hbuf = new byte[nSize + packet.BodySize];
-                Array.Copy(packet.Body, 0, hbuf, nSize, packet.BodySize);
-            }
-            else
-            {
-                header = 6; // hbuf + 6;
-                hend = hbuf.Length; // hbuf + sizeof(hbuf);
-            }
+            var hbuf = new byte[RTMP_MAX_HEADER_SIZE];
+            var header = 0;
+            var hend = hbuf.Length;
 
-            if (packet.ChannelNum > 319)
-            {
-                cSize = 2;
-            }
-            else if (packet.ChannelNum > 63)
-            {
-                cSize = 1;
-            }
+            var cSize = (packet.ChannelNum > 319)
+                ? 2
+                : (packet.ChannelNum > 63)
+                    ? 1
+                    : 0;
 
             if (cSize != 0)
             {
-                header -= cSize;
                 hSize += cSize;
             }
 
             if (t >= 0xffffff)
             {
-                header -= 4;
                 hSize += 4;
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING, "Larger timestamp than 24-bit: 0x{0:x}", t);
             }
@@ -1491,15 +1461,13 @@ namespace librtmp
                     break;
             }
 
-            hbuf[hptr++] = (byte)c; // *hptr++ = c;
+            hbuf[hptr++] = (byte)c;
             if (cSize != 0)
             {
-                int tmp = packet.ChannelNum - 64;
-                // *hptr++ = tmp & 0xff;
+                var tmp = packet.ChannelNum - 64;
                 hbuf[hptr++] = (byte)(tmp & 0xff);
                 if (cSize == 2)
                 {
-                    // *hptr++ = tmp >> 8;
                     hbuf[hptr++] = (byte)(tmp >> 8);
                 }
             }
@@ -1512,7 +1480,6 @@ namespace librtmp
             if (nSize > 4)
             {
                 hptr = AMF.AMF_EncodeInt24(hbuf, hptr, hend, packet.BodySize);
-                // *hptr++ = packet.PacketType;
                 hbuf[hptr++] = packet.PacketType;
             }
 
@@ -1539,7 +1506,6 @@ namespace librtmp
                 if (chunks > 1)
                 {
                     var tlen = chunks * (cSize + 1) + nSize + hSize;
-                    // tbuf = malloc(tlen);
                     tbuf = new byte[tlen];
                     toff = 0;
                 }
@@ -1551,19 +1517,22 @@ namespace librtmp
                 {
                     nChunkSize = nSize;
                 }
+
+                var chunk = new byte[nChunkSize + hSize];
+                Array.Copy(hbuf, chunk, hSize);
+                Array.Copy(packet.Body, buffer, chunk, hSize, nChunkSize);
+
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
-                Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, hbuf.Skip(header).ToArray(), (ulong)hSize);
-                Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, packet.Body.Skip(buffer).ToArray(), (ulong)nChunkSize);
+                Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, hbuf, (ulong)hSize);
+                Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, chunk.Skip(hSize).ToArray(), (ulong)nChunkSize);
                 if (tbuf != null)
                 {
-                    // memcpy(toff, header, nChunkSize + hSize);
-                    AMF.memcpy(tbuf, toff, hbuf, nChunkSize + hSize);
-                    toff += nChunkSize + hSize;
+                    AMF.memcpy(tbuf, toff, chunk, hSize + nChunkSize);
+                    toff += hSize + nChunkSize;
                 }
                 else
                 {
-                    // int wrote = WriteN(r, header, nChunkSize + hSize);
-                    var wrote = WriteN(r, hbuf.Skip(header).ToArray(), nChunkSize + hSize);
+                    var wrote = WriteN(r, chunk, nChunkSize + hSize);
                     if (!wrote)
                     {
                         return false;
@@ -1576,25 +1545,14 @@ namespace librtmp
 
                 if (nSize > 0)
                 {
-                    header = buffer - 1;
+                    header = 0;
                     hSize = 1;
-                    if (cSize != 0)
-                    {
-                        header -= cSize;
-                        hSize += cSize;
-                    }
-
-                    if (t >= 0xffffff)
-                    {
-                        header -= 4;
-                        hSize += 4;
-                    }
-
                     hbuf[header] = (byte)(0xc0 | c); // *header = (0xc0 | c);
+
                     if (cSize != 0)
                     {
-                        int tmp = packet.ChannelNum - 64;
-                        // header[1] = tmp & 0xff;
+                        hSize += cSize;
+                        var tmp = packet.ChannelNum - 64;
                         hbuf[header + 1] = (byte)(tmp & 0xff);
                         if (cSize == 2)
                         {
@@ -1605,6 +1563,7 @@ namespace librtmp
 
                     if (t >= 0xffffff)
                     {
+                        hSize += 4;
                         var extendedTimestamp = header + 1 + cSize;
                         AMF.AMF_EncodeInt32(hbuf, extendedTimestamp, extendedTimestamp + 4, t);
                     }
@@ -1613,8 +1572,7 @@ namespace librtmp
 
             if (tbuf != null)
             {
-                var wrote = WriteN(r, tbuf, toff); // toff - tbuf);
-                // free(tbuf);tbuf = null;
+                var wrote = WriteN(r, tbuf, toff);
                 if (!wrote)
                 {
                     return false;
@@ -1644,8 +1602,6 @@ namespace librtmp
                 }
             }
 
-            // TODO:
-            // memcpy(r.m_vecChannelsOut[packet.ChanelNum], packet, sizeof(RTMPPacket));
             var clonePacket = new RTMPPacket
             {
                 BodySize = packet.BodySize,

@@ -192,7 +192,7 @@ namespace librtmp
         private const int HEADERBUF = 128 * 1024;
 
         // static const char flvHeader[]
-        private static readonly byte[] flvHeader =
+        private static readonly byte[] FlvHeader =
         {
             (byte)'F', (byte)'L', (byte)'V', 0x01,
             0x00, /* 0x04 == audio, 0x01 == video */

@@ -2299,7 +2299,7 @@ namespace librtmp
                     ptrBuf = buf;
                 }
 
-                var pend = size + 4;
+                var pend = ptr + size + 4;
 
                 /* use to return timestamp of last processed packet */
 
@@ -2397,7 +2397,7 @@ namespace librtmp
                         {
                             prevTagSize = (int)AMF.AMF_DecodeInt32(packet.Body, (int)(packetBody + pos + 11 + dataSize));
 
-#if DEBUG
+#if _DEBUG
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG,
                                 "FLV Packet: type {0:X2}, dataSize: {1}, tagSize: {2}, timeStamp: {3} ms",
                                 packet.Body[packetBody + pos], dataSize, prevTagSize, nTimeStamp);

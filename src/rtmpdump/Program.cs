@@ -1237,6 +1237,7 @@ namespace rtmpdump
                 {
                     Log.RTMP_LogPrintf("{0} download at: {1:f3} kB\n", bResume ? "Resuming" : "Starting", (double)size / 1024.0);
                 }
+
                 if (bRealtimeStream)
                 {
                     Log.RTMP_LogPrintf("  in approximately realtime (disabled BUFX speedup hack)\n");

@@ -1673,10 +1673,10 @@ namespace librtmp
                     r.m_read.buflen = HEADERBUF;
 
                     // memcpy(mybuf, flvHeader, sizeof (flvHeader));
-                    Array.Copy(flvHeader, mybuf, flvHeader.Length);
-                    pmybuf += flvHeader.Length; // r.m_read.buf += sizeof (flvHeader);
-                    r.m_read.buflen -= flvHeader.Length;
-                    cnt += flvHeader.Length;
+                    Array.Copy(FlvHeader, mybuf, FlvHeader.Length);
+                    pmybuf += FlvHeader.Length; // r.m_read.buf += sizeof (flvHeader);
+                    r.m_read.buflen -= FlvHeader.Length;
+                    cnt += FlvHeader.Length;
 
                     while (r.m_read.timestamp == 0)
                     {
@@ -1737,7 +1737,8 @@ namespace librtmp
                     nRead = size;
                 }
 
-                Array.Copy(r.m_read.buf, r.m_read.bufpos, buf, bufoffset, nRead); // memcpy(buf, r.m_read.bufpos, nRead);
+                // memcpy(buf, r.m_read.bufpos, nRead);
+                Array.Copy(r.m_read.buf, r.m_read.bufpos, buf, bufoffset, nRead);
                 r.m_read.buflen -= nRead;
                 if (r.m_read.buflen != 0)
                 {

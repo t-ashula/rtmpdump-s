@@ -906,14 +906,14 @@ namespace librtmp
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av__result);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, txn);
             pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
-            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.m_nBWCheckCounter);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.m_nBWCheckCounter++);
 
             var packet = new RTMPPacket
             {
                 ChannelNum = 0x03, /* control channel (invoke) */
                 HeaderType = RTMP_PACKET_SIZE_MEDIUM,
                 PacketType = RTMP_PACKET_TYPE_INVOKE,
-                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter++), /* temp inc value. till we figure it out. */
+                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter), /* temp inc value. till we figure it out. */
                 InfoField2 = 0,
                 HasAbsTimestamp = false,
                 Body = pbuf,

@@ -1264,6 +1264,7 @@ namespace rtmpdump
             var buffer = new byte[BufferSize];
             var now = (int)RTMP.RTMP_GetTime();
             var lastUpdate = now - 1000;
+            var wrote = 0;
             do
             {
                 nRead = RTMP.RTMP_Read(rtmp, buffer, BufferSize);
@@ -1279,6 +1280,7 @@ namespace rtmpdump
                         else
                         {
                             file.Write(buffer, 0, nRead);
+                            wrote += nRead;
                         }
                     }
                     catch

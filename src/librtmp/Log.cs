@@ -224,7 +224,7 @@ namespace librtmp
                     }
 
                     var c = (char)data[off + i];
-                    if (char.IsLetterOrDigit(c) || !char.IsControl(c) || char.IsSymbol(c) || c == ' ')
+                    if (data[off + i] < 0x80 && (char.IsLetterOrDigit(c) || !char.IsControl(c) || char.IsSymbol(c) || c == ' '))
                     {
                         printable += c;
                     }
@@ -235,7 +235,7 @@ namespace librtmp
                 }
 
                 // const int BP_OFFSET = 9, BP_GRAPH = 60, BP_LEN = 80;
-                RTMP_Log(level, "  {0:x4}: {1, -24} {2, -24}  {3}", off, dump1, dump2, printable);
+                RTMP_Log(level, "  {0:x4}:  {1, -24} {2, -24}  {3, -18}", off, dump1, dump2, printable);
             }
         }
 

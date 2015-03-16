@@ -290,7 +290,6 @@ namespace librtmp
                     bool refill = false;
                     while (r.m_resplen != 0)
                     {
-                        int ret;
                         if (r.m_sb.sb_size < 13 || refill)
                         {
                             if (r.m_unackd == 0)
@@ -309,20 +308,15 @@ namespace librtmp
                             }
                         }
 
-                        if ((ret = HTTP_read(r, false)) == -1)
+                        var ret = HTTP_read(r, false);
+                        if (ret == -1)
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, No valid HTTP response found", __FUNCTION__);
                             RTMP_Close(r);
                             return 0;
                         }
-                        else if (ret == -2)
-                        {
-                            refill = true;
-                        }
-                        else
-                        {
-                            refill = false;
-                        }
+
+                        refill = ret == -2;
                     }
 
                     if (r.m_resplen != 0 && r.m_sb.sb_size == 0)
@@ -2349,13 +2343,12 @@ namespace librtmp
                 /* correct tagSize and obtain timestamp if we have an FLV stream */
                 if (packet.PacketType == RTMP_PACKET_TYPE_FLASH_VIDEO)
                 {
-                    int pos = 0;
-
                     /* grab first timestamp and see if it needs fixing */
                     nTimeStamp = AMF.AMF_DecodeInt24(packet.Body, packetBody + 4);
                     nTimeStamp |= (uint)(packet.Body[packetBody + 7] << 24);
                     int delta = (int)(packet.TimeStamp - nTimeStamp + r.m_read.nResumeTS);
 
+                    int pos = 0;
                     while (pos + 11 < nPacketLen)
                     {
                         /* size without header (11) and without prevTagSize (4) */

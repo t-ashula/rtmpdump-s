@@ -1133,9 +1133,8 @@ namespace librtmp
         public static bool RTMP_ReadPacket(RTMP r, ref RTMPPacket packet)
         {
             const string __FUNCTION__ = "RTMP_ReadPaceket";
-            byte[] hbuf = new byte[RTMP_MAX_HEADER_SIZE];
-            int header = 0; // hbuf
-            bool didAlloc = false; // int didAlloc = false;
+            var hbuf = new byte[RTMP_MAX_HEADER_SIZE];
+            var header = 0; // hbuf
 
             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}: fd={1}", __FUNCTION__, r.m_sb.sb_socket.LocalEndPoint);
 
@@ -1183,8 +1182,7 @@ namespace librtmp
 
             if (packet.ChannelNum >= r.m_channelsAllocatedIn)
             {
-                int n = packet.ChannelNum + 10;
-                r.m_channelsAllocatedIn = n;
+                r.m_channelsAllocatedIn = packet.ChannelNum + 10;
             }
 
             if (nSize == RTMP_LARGE_HEADER_SIZE) /* if we get a full header the timestamp is absolute */
@@ -1217,7 +1215,7 @@ namespace librtmp
 
             nSize--;
 
-            rbuf = new byte[nSize];
+            rbuf = new byte[nSize]; // TODO: nSize < 0
             if (nSize > 0 && ReadN(r, rbuf, nSize) != nSize)
             {
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to read RTMP packet header. type: {1:x}", __FUNCTION__, hbuf[0]);
@@ -1225,7 +1223,7 @@ namespace librtmp
             }
 
             Array.Copy(rbuf, 0, hbuf, header, nSize);
-            var hSize = nSize + (header);
+            var hSize = nSize + header;
 
             if (nSize >= 3)
             {
@@ -1276,7 +1274,6 @@ namespace librtmp
                     return false;
                 }
 
-                didAlloc = true;
                 packet.HeaderType = (byte)((hbuf[0] & 0xc0) >> 6);
             }
 
@@ -1388,8 +1385,7 @@ namespace librtmp
 
             if (packet.ChannelNum >= r.m_channelsAllocatedOut)
             {
-                int n = packet.ChannelNum + 10;
-                r.m_channelsAllocatedOut = n;
+                r.m_channelsAllocatedOut = packet.ChannelNum + 10;
             }
 
             var last = 0u;
@@ -1718,7 +1714,8 @@ namespace librtmp
                 r.m_read.flags |= RTMP_READ.RTMP_READ_HEADER;
             }
 
-            if (((r.m_read.flags & RTMP_READ.RTMP_READ_SEEKING) != 0x00) && r.m_read.buf != null)
+            if (((r.m_read.flags & RTMP_READ.RTMP_READ_SEEKING) != 0x00)
+                && r.m_read.buf != null)
             {
                 /* drop whatever's here */
                 // free(r.m_read.buf);
@@ -1740,7 +1737,7 @@ namespace librtmp
                 // memcpy(buf, r.m_read.bufpos, nRead);
                 Array.Copy(r.m_read.buf, r.m_read.bufpos, buf, bufoffset, nRead);
                 r.m_read.buflen -= nRead;
-                if (r.m_read.buflen != 0)
+                if (r.m_read.buflen == 0)
                 {
                     // free(r.m_read.buf);
                     r.m_read.buf = null;

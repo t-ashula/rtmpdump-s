@@ -636,7 +636,7 @@ namespace rtmpdump
                 {
                     try
                     {
-                        file = new FileStream(flvFile, FileMode.Append, FileAccess.Write);
+                        file = new FileStream(flvFile, FileMode.Create, FileAccess.Write);
                     }
                     catch (Exception)
                     {
@@ -848,12 +848,13 @@ namespace rtmpdump
                     return RD_STATUS.RD_FAILED;
                 }
 
-                uint dataOffset = AMF.AMF_DecodeInt32(hbuf.Skip(5).ToArray());
+                uint dataOffset = AMF.AMF_DecodeInt32(hbuf, 5);
+                file.Seek(dataOffset, SeekOrigin.Begin);
                 // fseek(*file, dataOffset, SEEK_SET);
                 // if (fread(hbuf, 1, 4, *file) != 4)
                 try
                 {
-                    file.Read(hbuf, (int)dataOffset, 4);
+                    file.Read(hbuf, 0, 4);
                 }
                 catch
                 {
@@ -879,7 +880,8 @@ namespace rtmpdump
                     // if (fread(hbuf, 1, 4, *file) != 4)
                     try
                     {
-                        file.Read(hbuf, (int)pos, 4);
+                        file.Seek(pos, SeekOrigin.Begin);
+                        file.Read(hbuf, 0, 4);
                     }
                     catch
                     {
@@ -887,7 +889,7 @@ namespace rtmpdump
                     }
 
                     // uint32_t dataSize = AMF_DecodeInt24(hbuf + 1);
-                    var dataSize = AMF.AMF_DecodeInt24(hbuf.Skip(1).ToArray());
+                    var dataSize = AMF.AMF_DecodeInt24(hbuf, 1);
 
                     if (hbuf[0] == 0x12)
                     {
@@ -906,7 +908,8 @@ namespace rtmpdump
                         // if (fread(buffer, 1, dataSize, *file) != dataSize)
                         try
                         {
-                            file.Read(buffer, (int)(pos + 11), (int)dataSize);
+                            file.Seek(pos + 11, SeekOrigin.Begin);
+                            file.Read(buffer, 0, (int)dataSize);
                         }
                         catch
                         {
@@ -1183,20 +1186,15 @@ namespace rtmpdump
         /// <param name="percent"> percentage downloaded [out]</param>
         /// <returns></returns>
         private RD_STATUS Download(
-            RTMP rtmp, FileStream file,
+            RTMP rtmp, Stream file,
             uint dSeek, uint dStopOffset, double duration, bool bResume, byte[] metaHeader, uint nMetaHeaderSize, byte[] initialFrame,
             byte initialFrameType, uint nInitialFrameSize, int nSkipKeyFrames,
             bool bStdoutMode, bool bLiveStream, bool bRealtimeStream,
             bool bHashes, bool bOverrideBufferTime, uint bufferTime,
             out double percent)
-        // percentage downloaded [out]
         {
             const string __FUNCTION__ = "Download";
-            // int32_t now, lastUpdate;
-            const int BufferSize = 64 * 1024;
-            // char* buffer;
-            int nRead;
-            // off_t size = ftello(file);
+
             var size = bStdoutMode ? 0 : file.Position; // ftello(file)
             ulong lastPercent = 0;
 
@@ -1261,8 +1259,9 @@ namespace rtmpdump
             rtmp.m_read.nMetaHeaderSize = nMetaHeaderSize;
             rtmp.m_read.nInitialFrameSize = nInitialFrameSize;
 
+            int nRead;
+            const int BufferSize = 64 * 1024;
             var buffer = new byte[BufferSize];
-
             var now = (int)RTMP.RTMP_GetTime();
             var lastUpdate = now - 1000;
             do
@@ -1271,7 +1270,6 @@ namespace rtmpdump
                 // Log.RTMP_LogPrintf("nRead: {0}\n", nRead);
                 if (nRead > 0)
                 {
-                    // if (fwrite(buffer, sizeof (unsigned char ), nRead, file) != (size_t)nRead)
                     try
                     {
                         if (bStdoutMode)
@@ -1286,14 +1284,14 @@ namespace rtmpdump
                     catch
                     {
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}: Failed writing, exiting!", __FUNCTION__);
-                        // free(buffer);
                         return RD_STATUS.RD_FAILED;
                     }
 
                     size += nRead;
 
                     // Log.RTMP_LogPrintf("write {0}bytes ({1:f1} kB)\n", nRead, nRead / 1024.0);
-                    if (duration <= 0) // if duration unknown try to get it from the stream (onMetaData)
+                    // if duration unknown try to get it from the stream (onMetaData)
+                    if (duration <= 0)
                     {
                         duration = RTMP.RTMP_GetDuration(rtmp);
                     }
@@ -1360,11 +1358,11 @@ namespace rtmpdump
                     }
                 }
             }
+
             while (!RTMP.RTMP_ctrlC && nRead > -1
                 && RTMP.RTMP_IsConnected(rtmp)
                 && !RTMP.RTMP_IsTimedout(rtmp));
 
-            // free(buffer);
             if (nRead < 0)
             {
                 nRead = rtmp.m_read.status;

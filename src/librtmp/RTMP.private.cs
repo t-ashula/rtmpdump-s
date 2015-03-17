@@ -2442,7 +2442,7 @@ namespace librtmp
             {
                 len = ret > buflen ? buflen : ret;
                 // memcpy(buf, r.m_read.buf, len);
-                Array.Copy(r.m_read.buf, buf, len);
+                Array.Copy(r.m_read.buf, 0, buf, offset, len);
                 r.m_read.bufpos = len; // r.m_read.buf + len;
                 r.m_read.buflen = ret - len;
             }

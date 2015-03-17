@@ -1664,7 +1664,6 @@ namespace librtmp
             {
                 if ((r.m_read.flags & RTMP_READ.RTMP_READ_RESUME) == 0x00)
                 {
-                    // char* mybuf = malloc(HEADERBUF),
                     var mybuf = new byte[HEADERBUF];
                     var end = HEADERBUF;
                     int cnt = 0;

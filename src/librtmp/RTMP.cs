@@ -466,11 +466,20 @@ namespace librtmp
 
             try
             {
-                r.m_sb.sb_socket.Connect(remote);
+                // to mono socket.connect
+                var dnsep = remote as DnsEndPoint;
+                if ( dnsep != null )
+                {
+                    r.m_sb.sb_socket.Connect(dnsep.Host, dnsep.Port);
+                }
+                else
+                {
+                    r.m_sb.sb_socket.Connect(remote);
+                }
             }
             catch (Exception ee)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to connect socket. ({1}) ", __FUNCTION__, ee.Message);
+                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to connect socket. ({1}) ({2})", __FUNCTION__, ee);
                 RTMP_Close(r);
                 return false;
             }

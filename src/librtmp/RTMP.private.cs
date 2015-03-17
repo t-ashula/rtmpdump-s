@@ -288,7 +288,7 @@ namespace librtmp
                 if (useHttp)
                 {
                     bool refill = false;
-                    while (r.m_resplen != 0)
+                    while (r.m_resplen == 0)
                     {
                         if (r.m_sb.sb_size < 13 || refill)
                         {
@@ -777,8 +777,6 @@ namespace librtmp
                 BodySize = (uint)enc
             };
 
-            // - packet.Body;
-
             return RTMP_SendPacket(r, packet, false);
         }
 
@@ -906,14 +904,14 @@ namespace librtmp
             enc = AMF.AMF_EncodeString(pbuf, enc, pend, av__result);
             enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, txn);
             pbuf[enc++] = (byte)AMFDataType.AMF_NULL;
-            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.m_nBWCheckCounter++);
+            enc = AMF.AMF_EncodeNumber(pbuf, enc, pend, r.m_nBWCheckCounter);
 
             var packet = new RTMPPacket
             {
                 ChannelNum = 0x03, /* control channel (invoke) */
                 HeaderType = RTMP_PACKET_SIZE_MEDIUM,
                 PacketType = RTMP_PACKET_TYPE_INVOKE,
-                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter), /* temp inc value. till we figure it out. */
+                TimeStamp = (uint)(0x16 * r.m_nBWCheckCounter++), /* temp inc value. till we figure it out. */
                 InfoField2 = 0,
                 HasAbsTimestamp = false,
                 Body = pbuf,
@@ -1497,6 +1495,7 @@ namespace librtmp
                         {
                             Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGINFO, "{0}:", prop.p_name.to_s());
                         }
+
                         DumpMetaData(prop.p_object);
                         break;
 
@@ -1703,12 +1702,12 @@ namespace librtmp
                     case 31:
                         tmp = AMF.AMF_DecodeInt32(packet.Body, 2);
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, Stream BufferEmpty {1}", __FUNCTION__, tmp);
-                        if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_BUFX) != 0x00)
+                        if ((r.Link.lFlags & RTMP_LNK.RTMP_LNK_FLAG.RTMP_LF_BUFX) == 0x00)
                         {
                             break;
                         }
 
-                        if (r.m_pausing != 0)
+                        if (r.m_pausing == 0)
                         {
                             r.m_pauseStamp = (uint)(r.m_mediaChannel < r.m_channelsAllocatedIn ? r.m_channelTimestamp[r.m_mediaChannel] : 0); // TODO:
                             RTMP_SendPause(r, true, (int)r.m_pauseStamp); // TODO:
@@ -1719,6 +1718,7 @@ namespace librtmp
                             RTMP_SendPause(r, false, (int)r.m_pauseStamp); // TODO:
                             r.m_pausing = 3;
                         }
+                        
                         break;
 
                     case 32:
@@ -1841,6 +1841,7 @@ namespace librtmp
                 // free(r.m_read.buf);
                 r.m_read.buf = null;
             }
+
             r.m_read.dataType = 0;
             r.m_read.flags = 0;
             r.m_read.status = 0;

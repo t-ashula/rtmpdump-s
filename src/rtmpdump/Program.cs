@@ -67,29 +67,23 @@ namespace rtmpdump
 
             int nSkipKeyFrames = DEF_SKIPFRM; // skip this number of keyframes when resuming
 
-            // int bOverrideBufferTime = FALSE; // if the user specifies a buffer time override this is true
-            bool bOverrideBufferTime = false;
-            // int bStdoutMode = TRUE; // if true print the stream directly to stdout, messages go to stderr
-            bool bStdoutMode = true;
-            // int bResume = FALSE; // true in resume mode
-            bool bResume = false;
+            bool bOverrideBufferTime = false; // if the user specifies a buffer time override this is true
+            bool bStdoutMode = true; // if true print the stream directly to stdout, messages go to stderr
+            bool bResume = false; // true in resume mode
 
-            uint dSeek = 0; // uint32_t dSeek = 0; // seek position in resume mode, 0 otherwise
-            int bufferTime = DEF_BUFTIME; // uint32_t bufferTime = DEF_BUFTIME;
+            uint dSeek = 0; // seek position in resume mode, 0 otherwise
+            int bufferTime = DEF_BUFTIME; 
 
             // meta header and initial frame for the resume mode (they are read from the file and compared with
             // the stream we are trying to continue
-            // char* metaHeader = 0;
-            byte[] metaHeader = new byte[0];
+            byte[] metaHeader = new byte[0]; // char* metaHeader = 0;
             uint nMetaHeaderSize = 0;
 
             // video keyframe for matching
-            // char* initialFrame = 0;
-            byte[] initialFrame = new byte[0];
 
+            byte[] initialFrame = new byte[0]; // char* initialFrame = 0;
             uint nInitialFrameSize = 0;
-            // int initialFrameType = 0; // tye: audio or video
-            byte initialFrameType = 0;
+            byte initialFrameType = 0; // tye: audio or video
 
             AVal hostname = new AVal();
             AVal playpath = new AVal();
@@ -98,16 +92,13 @@ namespace rtmpdump
             int port = -1;
             int protocol = RTMP.RTMP_PROTOCOL_UNDEFINED;
             int retries = 0;
-            // int bLiveStream = FALSE; // is it a live stream? then we can't seek/resume
-            bool bLiveStream = false;
-            // int bRealtimeStream = FALSE; // If true, disable the BUFX hack (be patient)
-            bool bRealtimeStream = false;
-            // int bHashes = FALSE; // display byte counters not hashes by default
-            bool bHashes = false;
+            bool bLiveStream = false; // is it a live stream? then we can't seek/resume
+            bool bRealtimeStream = false; // If true, disable the BUFX hack (be patient)
+            bool bHashes = false; // display byte counters not hashes by default
 
             int timeout = DEF_TIMEOUT; // timeout connection after 120 seconds
-            int dStartOffset = 0; // uint32_t dStartOffset = 0; // seek position in non-live mode
-            int dStopOffset = 0; // uint32_t dStopOffset = 0;
+            int dStartOffset = 0; // seek position in non-live mode
+            int dStopOffset = 0;
 
             AVal fullUrl = new AVal();
             AVal swfUrl = new AVal();
@@ -116,7 +107,7 @@ namespace rtmpdump
             AVal app = new AVal();
             AVal auth = new AVal();
             AVal swfHash = new AVal();
-            int swfSize = 0; // uint32_t swfSize = 0;
+            int swfSize = 0; 
             AVal flashVer = new AVal();
             AVal sockshost = new AVal();
 
@@ -126,7 +117,6 @@ namespace rtmpdump
             byte[] hash = new byte[RTMP_LNK.RTMP_SWF_HASHLEN]; // [RTMP_SWF_HASHLEN];
 #endif
 
-            //  char* flvFile = 0;
             var flvFile = string.Empty;
 
             Console.CancelKeyPress += sigIntHandler; // signal(SIGINT, sigIntHandler);
@@ -153,7 +143,7 @@ namespace rtmpdump
                 index++;
             }
 
-            Log.RTMP_LogPrintf("RTMPDump {0}\n", "2.4"); // TODO: RTMPDUMP_VERSION
+            Log.RTMP_LogPrintf("RTMPDump {0}\n", "v2.4"); // TODO: RTMPDUMP_VERSION
             Log.RTMP_LogPrintf("(c) 2010 Andrej Stepanchuk, Howard Chu, The Flvstreamer Team; license: GPL\n");
 
             if (!InitSockets())
@@ -290,6 +280,7 @@ namespace rtmpdump
                         Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "Unknown protocol specified: {0}", protocol);
                         return RD_STATUS.RD_FAILED;
                     }
+                    
                     i++;
                 }
                 else if (arg == "-y" || arg == "--playpath")
@@ -411,6 +402,7 @@ namespace rtmpdump
                     {
                         dStartOffset = (int)(offset * 1000.0);
                     }
+
                     ++i;
                 }
                 else if (arg == "-B" || arg == "--stop")
@@ -420,6 +412,7 @@ namespace rtmpdump
                     {
                         dStopOffset = (int)(offset * 1000.0);
                     }
+
                     ++i;
                 }
                 else if (arg == "-T" || arg == "--token")
@@ -714,7 +707,7 @@ namespace rtmpdump
                     {
                         /* Only one try at reconnecting... */
                         retries = 1;
-                        dSeek = rtmp.m_pauseStamp; // TODO:
+                        dSeek = rtmp.m_pauseStamp;
                         if (dStopOffset > 0)
                         {
                             if (dStopOffset <= dSeek)
@@ -948,11 +941,9 @@ namespace rtmpdump
                             bFoundMetaHeader = true;
                             break;
                         }
-                        //metaObj.Reset();
-                        //delete obj;
                     }
 
-                    pos += dataSize + 11 + 4; // TODO: uint
+                    pos += dataSize + 11 + 4; 
                 }
 
                 // free(buffer);
@@ -981,8 +972,8 @@ namespace rtmpdump
         // length of initialFrame [out]
         {
             const int BufferSize = 16;
-            byte[] buffer = new byte[BufferSize];
-            byte dataType;
+            var buffer = new byte[BufferSize];
+
             var size = file.Length;
 
             dSeek = 0;
@@ -993,6 +984,7 @@ namespace rtmpdump
             // fseek(file, 0, SEEK_END);size = ftello(file);
             // fseek(file, 4, SEEK_SET);
             // if (fread(&dataType, sizeof(uint8_t), 1, file) != 1)
+            byte dataType;
             try
             {
                 var buf = new byte[1];
@@ -1030,7 +1022,8 @@ namespace rtmpdump
                 try
                 {
                     // xread = fread(buffer, 1, 4, file);
-                    file.Read(buffer, (int)(size - tsize - 4), 4);
+                    file.Seek((int)(size - tsize - 4), SeekOrigin.Begin);
+                    file.Read(buffer, 0, 4);
                 }
                 catch
                 {
@@ -1060,7 +1053,8 @@ namespace rtmpdump
                 // if (fread(buffer, 1, 12, file) != 12)
                 try
                 {
-                    file.Read(buffer, (int)(size - tsize), 12);
+                    file.Seek((int)(size - tsize), SeekOrigin.Begin);
+                    file.Read(buffer, 0, 12);
                 }
                 catch
                 {
@@ -1069,7 +1063,7 @@ namespace rtmpdump
                 }
                 //*
 #if _DEBUG
-                uint32_t ts = AMF.AMF_DecodeInt24(buffer + 4);
+                uint32_t ts = AMF.AMF_DecodeInt24(buffer, 4);
                 ts |= (buffer[7] << 24);
                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0:02X}: TS: {1} ms", buffer[0], ts);
 #endif //*/
@@ -1102,7 +1096,8 @@ namespace rtmpdump
             // if (fread(*initialFrame, 1, *nInitialFrameSize, file) != *nInitialFrameSize)
             try
             {
-                file.Read(initialFrame, (int)(size - tsize + 11), (int)nInitialFrameSize);
+                file.Seek((int)(size - tsize + 11), SeekOrigin.Begin);
+                file.Read(initialFrame, 0, (int)nInitialFrameSize);
             }
             catch
             {
@@ -1110,7 +1105,7 @@ namespace rtmpdump
                 return RD_STATUS.RD_FAILED;
             }
 
-            dSeek = AMF.AMF_DecodeInt24(buffer.Skip(4).ToArray()); // set seek position to keyframe tmestamp
+            dSeek = AMF.AMF_DecodeInt24(buffer, 4); // set seek position to keyframe tmestamp
             dSeek |= (uint)(buffer[7] << 24);
             //}
             //else // handle audio only, we can seek anywhere we'd like
@@ -1161,7 +1156,6 @@ namespace rtmpdump
             return RD_STATUS.RD_SUCCESS;
         }
 
-        //
         /// <summary>
         /// int Download(RTMP * rtmp, FILE * file, uint32_t dSeek, uint32_t dStopOffset, double duration, int bResume, char *metaHeader, uint32_t nMetaHeaderSize, char *initialFrame, int initialFrameType, uint32_t nInitialFrameSize, int nSkipKeyFrames, int bStdoutMode, int bLiveStream, int bRealtimeStream, int bHashes, int bOverrideBufferTime, uint32_t bufferTime, double *percent)
         /// </summary>
@@ -1196,7 +1190,6 @@ namespace rtmpdump
             const string __FUNCTION__ = "Download";
 
             var size = bStdoutMode ? 0 : file.Position; // ftello(file)
-            ulong lastPercent = 0;
 
             rtmp.m_read.timestamp = dSeek;
 
@@ -1259,12 +1252,12 @@ namespace rtmpdump
             rtmp.m_read.nMetaHeaderSize = nMetaHeaderSize;
             rtmp.m_read.nInitialFrameSize = nInitialFrameSize;
 
+            ulong lastPercent = 0;
             int nRead;
             const int BufferSize = 64 * 1024;
             var buffer = new byte[BufferSize];
             var now = (int)RTMP.RTMP_GetTime();
             var lastUpdate = now - 1000;
-            var wrote = 0;
             do
             {
                 nRead = RTMP.RTMP_Read(rtmp, buffer, BufferSize);
@@ -1280,7 +1273,6 @@ namespace rtmpdump
                         else
                         {
                             file.Write(buffer, 0, nRead);
-                            wrote += nRead;
                         }
                     }
                     catch

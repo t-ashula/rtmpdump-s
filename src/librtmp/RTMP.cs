@@ -1215,39 +1215,42 @@ namespace librtmp
 
             nSize--;
 
-            rbuf = new byte[nSize]; // TODO: nSize < 0
-            if (nSize > 0 && ReadN(r, rbuf, nSize) != nSize)
+            if (nSize > 0)
             {
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to read RTMP packet header. type: {1:x}", __FUNCTION__, hbuf[0]);
-                return false;
-            }
-
-            Array.Copy(rbuf, 0, hbuf, header, nSize);
-            var hSize = nSize + header;
-
-            if (nSize >= 3)
-            {
-                packet.TimeStamp = AMF.AMF_DecodeInt24(hbuf, header);
-
-                // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, reading RTMP packet chunk on channel {1:x}, headersz {2}, timestamp {3}, abs timestamp {4}", __FUNCTION__, packet.ChannelNum, nSize, packet.TimeStamp, packet.HasAbsTimestamp);
-
-                if (nSize >= 6)
+                rbuf = new byte[nSize];
+                if (ReadN(r, rbuf, nSize) != nSize)
                 {
-                    packet.BodySize = AMF.AMF_DecodeInt24(hbuf, header + 3);
-                    packet.BytesRead = 0;
-                    RTMPPacket.RTMPPacket_Free(packet);
+                    Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGERROR, "{0}, failed to read RTMP packet header. type: {1:x}", __FUNCTION__, hbuf[0]);
+                    return false;
+                }
 
-                    if (nSize > 6)
+                Array.Copy(rbuf, 0, hbuf, header, nSize);
+
+                if (nSize >= 3)
+                {
+                    packet.TimeStamp = AMF.AMF_DecodeInt24(hbuf, header);
+
+                    // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG, "{0}, reading RTMP packet chunk on channel {1:x}, headersz {2}, timestamp {3}, abs timestamp {4}", __FUNCTION__, packet.ChannelNum, nSize, packet.TimeStamp, packet.HasAbsTimestamp);
+
+                    if (nSize >= 6)
                     {
-                        packet.PacketType = hbuf[header + 6]; // header[6];
-                        if (nSize == 11)
+                        packet.BodySize = AMF.AMF_DecodeInt24(hbuf, header + 3);
+                        packet.BytesRead = 0;
+                        packet.Body = null; // RTMPPacket.RTMPPacket_Free(packet);
+
+                        if (nSize > 6)
                         {
-                            packet.InfoField2 = DecodeInt32LE(hbuf, header + 7);
+                            packet.PacketType = hbuf[header + 6]; // header[6];
+                            if (nSize == 11)
+                            {
+                                packet.InfoField2 = DecodeInt32LE(hbuf, header + 7);
+                            }
                         }
                     }
                 }
             }
 
+            var hSize = nSize + header;
             var extendedTimestamp = packet.TimeStamp == 0xffffff;
             if (extendedTimestamp)
             {
@@ -1263,7 +1266,7 @@ namespace librtmp
                 hSize += 4;
             }
 
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
+            // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
             Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, hbuf, (ulong)hSize);
 
             if (packet.BodySize > 0 && packet.Body == null)
@@ -1305,12 +1308,13 @@ namespace librtmp
                 return false;
             }
 
-            Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
+            // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
             Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, rbuf, (ulong)nChunk);
             if (nChunk != 0)
             {
                 Array.Copy(rbuf, 0, packet.Body, packet.BytesRead, nChunk);
             }
+
             packet.BytesRead += (uint)nChunk;
 
             /* keep the packet as ref for other packets on this channel */
@@ -1518,7 +1522,7 @@ namespace librtmp
                 Array.Copy(hbuf, chunk, hSize);
                 Array.Copy(packet.Body, buffer, chunk, hSize, nChunkSize);
 
-                Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
+                // Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, "{0}:", __FUNCTION__);
                 Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, hbuf, (ulong)hSize);
                 Log.RTMP_LogHexString(Log.RTMP_LogLevel.RTMP_LOGDEBUG2, chunk.Skip(hSize).ToArray(), (ulong)nChunkSize);
                 if (tbuf != null)

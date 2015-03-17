@@ -2398,7 +2398,7 @@ namespace librtmp
 
                             if (prevTagSize != (dataSize + 11))
                             {
-#if DEBUG
+#if _DEBUG
                                 Log.RTMP_Log(Log.RTMP_LogLevel.RTMP_LOGWARNING,
                                     "Tag and data size are not consitent, writing tag size according to dataSize+11: {0}",
                                     dataSize + 11);

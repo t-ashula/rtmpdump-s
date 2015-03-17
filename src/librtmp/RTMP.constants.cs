@@ -112,6 +112,7 @@ namespace librtmp
             "rtmp", "rtmpt", "rtmpe", "rtmpte", "rtmps", "rtmpts", "", "", "rtmfp"
         };
 
+        /// <summary>packetSize = { 12, 8, 4, 1 } </summary>
         private static readonly int[] packetSize = { 12, 8, 4, 1 };
 
         /// <summary> const AVal RTMP_DefaultFlashVer </summary>

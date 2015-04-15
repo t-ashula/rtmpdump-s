@@ -142,3 +142,53 @@ TEST(AMFTestGroup, EncodeNamedStringTest1)
   CHECK_EQUAL( (unsigned char)0x00, (unsigned char)buf[12] );
 }
 
+TEST(AMFTestGroup, DecodeInt16Test1)
+{
+  unsigned short expected = 0x1234, actual;
+  char buf[100] = {0}, *enc = buf, *pend = buf + sizeof(buf);
+  enc = AMF_EncodeInt16(enc, pend, expected);
+  actual = AMF_DecodeInt16(buf);
+  CHECK_EQUAL( expected, actual );
+}
+
+TEST(AMFTestGroup, DecodeInt24Test1)
+{
+  unsigned int expected = 0x123456, actual;
+  char buf[100] = {0}, *enc = buf, *pend = buf + sizeof(buf);
+  enc = AMF_EncodeInt24(enc, pend, expected);
+  actual = AMF_DecodeInt24(buf);
+  CHECK_EQUAL( expected, actual );
+}
+
+TEST(AMFTestGroup, DecodeInt32Test1)
+{
+  unsigned int expected = 0x12345678, actual;
+  char buf[100] = {0}, *enc = buf, *pend = buf + sizeof(buf);
+  enc = AMF_EncodeInt32(enc, pend, expected);
+  actual = AMF_DecodeInt32(buf);
+  CHECK_EQUAL( expected, actual );
+}
+
+TEST(AMFTestGroup, DecodeStringTest1)
+{
+  AVal name = AVC("name"), actual;
+  char buf[100] = {0}, *enc = buf, *pend = buf + sizeof(buf);
+  enc = AMF_EncodeString(enc, pend, &name);
+  AMF_DecodeString(buf + 1, &actual);
+  
+  CHECK_EQUAL( 4, actual.av_len );
+  CHECK_EQUAL( (unsigned char)'n', actual.av_val[0] );
+  CHECK_EQUAL( (unsigned char)'a', actual.av_val[1] );
+  CHECK_EQUAL( (unsigned char)'m', actual.av_val[2] );
+  CHECK_EQUAL( (unsigned char)'e', actual.av_val[3] );
+}
+
+TEST(AMFTestGroup, DecodeNumberTest1)
+{
+  double expected = -2.3456, actual;
+  char buf[100] = {0}, *enc = buf, *pend = buf + sizeof(buf);
+  enc = AMF_EncodeNumber( enc, pend, expected );
+  actual = AMF_DecodeNumber(buf + 1); // skip AMFDatatype
+  CHECK_EQUAL( expected, actual );
+}
+    
